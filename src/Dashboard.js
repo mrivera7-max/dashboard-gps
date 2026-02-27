@@ -107,6 +107,33 @@ export default function Dashboard({ logout }) {
     }
   };
 
+  const sincronizarSheets = async () => {
+  try {
+    if (authLoading) {
+      setMsg("Cargando sesión…");
+      return;
+    }
+    if (!user) {
+      setMsg("Debes iniciar sesión.");
+      return;
+    }
+    if (role !== "admin") {
+      setMsg("No tienes permisos para sincronizar.");
+      return;
+    }
+
+    setMsg("Sincronizando desde Google Sheets…");
+    const fn = httpsCallable(functions, "syncSheets");
+    const res = await fn();
+
+    const { created, updated, skipped } = res?.data || {};
+    setMsg(`Listo ✅ created:${created ?? 0} updated:${updated ?? 0} skipped:${skipped ?? 0}`);
+  } catch (e) {
+    console.error(e);
+    setMsg(e?.message || "Error sincronizando");
+  }
+  };
+
   return (
   <div style={styles.page2col}>
     {/* SIDEBAR */}
@@ -179,6 +206,15 @@ export default function Dashboard({ logout }) {
         {/* Botón recalcular solo admin */}
         {role === "admin" ? (
           <div style={styles.actionRow}>
+            <button
+              onClick={sincronizarSheets}
+              style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
+              disabled={authLoading}
+              title={authLoading ? "Cargando sesión…" : "Sincronizar Sheets → Firestore"}
+            >
+              Sincronizar Sheets
+            </button>
+
             <button
               onClick={recalcular}
               style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
