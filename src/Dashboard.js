@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import { doc, onSnapshot } from "firebase/firestore";
+import IntegrantesAdminView from "./IntegrantesAdminView";
+import EstadoGeneralGrupo from "./components/EstadoGeneralGrupo";
 
 import gpsLogo from "./assets/logo-gps.png";
 import udiLogo from "./assets/logo-udi.png";
 
-// AJUSTA ESTA RUTA a tu proyecto
 import { auth, db, functions } from "./firebaseConfig"; // ajusta ruta real
 
 const UDI_BLUE_DARK = "#1B75BC";
@@ -18,12 +19,12 @@ const SYSTEM = {
 };
 
 export default function Dashboard({ logout }) {
-  // Rol (según tu implementación actual con localStorage)
-  const role = useMemo(
+    const role = useMemo(
     () => localStorage.getItem("gps_role_selected") || "no definido",
     []
   );
   const [activeView, setActiveView] = useState("estado"); // estado | docentes
+  const [estadoRefresh, setEstadoRefresh] = useState(0);
   // Sesión (estado REAL de Firebase Auth)
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -101,6 +102,7 @@ export default function Dashboard({ logout }) {
       // Si tu function retorna {status:"ok"} esto queda perfecto
       const status = res?.data?.status;
       setMsg(status === "ok" ? "Listo ✅ KPIs actualizados" : "Listo ✅");
+      setEstadoRefresh((x) => x + 1);
     } catch (e) {
       console.error(e);
       setMsg(e?.message || "Error recalculando KPIs");
@@ -128,10 +130,12 @@ export default function Dashboard({ logout }) {
 
     const { created, updated, skipped } = res?.data || {};
     setMsg(`Listo ✅ created:${created ?? 0} updated:${updated ?? 0} skipped:${skipped ?? 0}`);
+    setEstadoRefresh((x) => x + 1);
   } catch (e) {
     console.error(e);
     setMsg(e?.message || "Error sincronizando");
   }
+  
   };
 
   return (
@@ -172,7 +176,7 @@ export default function Dashboard({ logout }) {
             onClick={() => setActiveView("estado")}
           />
           <NavBtn
-            text="Docentes"
+            text="Integrantes"
             active={activeView === "docentes"}
             onClick={() => setActiveView("docentes")}
           />
@@ -229,41 +233,11 @@ export default function Dashboard({ logout }) {
       </div>
 
       <div style={styles.content}>
-        {activeView === "estado" ? (
-          <>
-            {/* KPIs */}
-            {kpiError ? <div style={styles.errorBox}>{kpiError}</div> : null}
-
-            <div style={styles.kpiGrid}>
-              <KPI title="Total productos" value={kpis.total_productos ?? "—"} />
-              <KPI title="Total investigadores" value={kpis.total_investigadores ?? "—"} />
-              <KPI title="Total proyectos" value={kpis.total_proyectos ?? "—"} />
-            </div>
-
-            <div style={styles.mainGrid}>
-              <Panel title="Producción por año (próximo)">
-                <Placeholder />
-              </Panel>
-
-              <Panel title="Productos por categoría (próximo)">
-                <Placeholder />
-              </Panel>
-
-              <Panel title="Tabla de productos (próximo)" span={2}>
-                <Placeholder />
-              </Panel>
-            </div>
-          </>
-        ) : (
-          <Panel title="Consulta de docentes">
-            <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ fontWeight: 800, color: "#4A5568" }}>
-                Aquí va el buscador + tabla de docentes (por ejemplo: nombre, correo, estado, categoría MinCiencias, productos).
-              </div>
-              <Placeholder />
-            </div>
-          </Panel>
-        )}
+       {activeView === "estado" ? (
+          <EstadoGeneralGrupo refreshKey={estadoRefresh} />
+        ) : activeView === "docentes" ? (
+          <IntegrantesAdminView refreshKey={estadoRefresh} />
+        ) : null}
       </div>
     </main>
   </div>
@@ -504,6 +478,7 @@ page2col: {
   gridTemplateColumns: "280px 1fr",
   background: "rgba(45,156,219,0.10)",
   fontFamily: "Arial, sans-serif",
+  overflow: "hidden",
 },
 sidebar: {
   background: "linear-gradient(180deg, #1B75BC 0%, #0F3E68 100%)",
@@ -512,6 +487,10 @@ sidebar: {
   flexDirection: "column",
   justifyContent: "space-between",
   color: "white",
+
+  position: "sticky",
+  top: 0,
+  height: "100vh",
 },
 sideTop: { padding: 16 },
 sideBrand: { display: "flex", gap: 10, alignItems: "center" },
@@ -537,7 +516,13 @@ navBtnActive: {
   color: "#1B75BC",
 },
 
-sideBottom: { padding: 16, borderTop: "1px solid rgba(45,156,219,0.18)" },
+sideBottom: { 
+  padding: 16, 
+  borderTop: "1px solid rgba(45,156,219,0.18)",
+  position: "sticky",
+  bottom: 0,
+  background: "linear-gradient(180deg, rgba(27,117,188,0.0) 0%, rgba(15,62,104,1) 35%)", 
+},
 logoutBtnSide: {
   width: "100%",
   padding: "12px 12px",
@@ -555,7 +540,13 @@ systemInfoSide: {
   fontWeight: 700,
   lineHeight: 1.4,
 },
-main: { minWidth: 0, display: "flex", flexDirection: "column" },
+main: { 
+  minWidth: 0, 
+  display: "flex", 
+  flexDirection: "column",
+  height: "100vh",
+  overflowY: "auto", 
+},
 
 udiBlock: {
   display: "flex",
