@@ -10,7 +10,7 @@ import {
   LineChart, Line,
   BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend
-} from "recharts";
+} from "recharts"; 
 
 const getProyTitulo = (pr) =>
   pr.titulo ||
@@ -369,7 +369,7 @@ useEffect(() => {
 
   // UI mínima (ajústala a tu estilo)
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
       {/* Panel izquierda: lista */}
       <div
         style={{
@@ -571,7 +571,7 @@ useEffect(() => {
           </>
         )}
       </div>
-    </div>
+      </div>
   );
 }
 
