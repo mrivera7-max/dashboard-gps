@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   collection, query, where, orderBy, onSnapshot,
-  doc, updateDoc, serverTimestamp
+  getDocs, addDoc, doc, updateDoc, serverTimestamp
 } from "firebase/firestore";
 
 import { db } from "./firebaseConfig"; // ajusta tu import
@@ -79,6 +79,12 @@ const CAT_MINCIENCIAS_LABEL = {
   SC: "Sin categoría",
 };
 
+const makeInvId = (docId) => {
+  const clean = (docId || "").replace(/[^a-zA-Z0-9]/g, "");
+  const tail = clean.slice(-6).toUpperCase();
+  return `INV-${tail || "XXXXXX"}`;
+};
+
 function PerfilHeader({ inv }) {
   const nombre = inv
     ? `${inv.nombres || ""} ${inv.apellidos || ""}`.trim() || "—"
@@ -86,6 +92,11 @@ function PerfilHeader({ inv }) {
   
   const catCode = (inv?.categoria_minciencias_investigador || "").toString().trim().toUpperCase();
   const catLabel = CAT_MINCIENCIAS_LABEL[catCode] || "Sin categoría";
+
+  const makeInvId = (docId) => {
+  const tail = (docId || "").replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase();
+  return `INV-${tail || "XXXXXX"}`;
+};
 
   return (
     <div style={{ marginBottom: 10 }}>
@@ -634,7 +645,116 @@ const th = { textAlign: "left", borderBottom: "1px solid #eee", padding: 8 };
 const td = { borderBottom: "1px solid #f3f3f3", padding: 8, fontSize: 14 };
 
 function AdminIntegrantesModal({ open, onClose, integrantes, onToggle }) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const [form, setForm] = useState({
+    nombres: "",
+    apellidos: "",
+    email: "",
+    identificacion: "",
+    genero: "",
+    categoria_minciencias_investigador: "SC",
+    anio_vinculacion: "",
+    activo: true,
+  });
+
   if (!open) return null;
+
+  const isEmailValid = (email) => {
+    if (!email) return true; // permitido vacío si aún no lo tienen
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  };
+
+  const resetForm = () => {
+    setForm({
+      nombres: "",
+      apellidos: "",
+      email: "",
+      identificacion: "",
+      genero: "",
+      categoria_minciencias_investigador: "SC",
+      anio_vinculacion: "",
+      activo: true,
+    });
+    setErr("");
+  };
+
+  const createIntegrante = async () => {
+    setErr("");
+
+    const nombres = form.nombres.trim();
+    const apellidos = form.apellidos.trim();
+    const email = form.email.trim().toLowerCase();
+
+    if (!nombres || !apellidos) {
+      setErr("Nombres y apellidos son obligatorios.");
+      return;
+    }
+    if (!isEmailValid(email)) {
+      setErr("Email inválido.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Anti-duplicado por email (si lo llenan)
+      if (email) {
+        const qDup = query(
+          collection(db, "investigadores"),
+          where("email", "==", email)
+        );
+        const snapDup = await getDocs(qDup);
+        if (!snapDup.empty) {
+          setErr("Ya existe un integrante con ese email.");
+          setSaving(false);
+          return;
+        }
+      }
+
+      const activo = !!form.activo;
+
+      // 1) crear doc
+      const ref = await addDoc(collection(db, "investigadores"), {
+        ...form,
+        nombres,
+        apellidos,
+        email: email || "",
+        activo,
+        estado_investigador: activo ? "Activo" : "Inactivo",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // 2) setear id_investigador estable
+      const newId = makeInvId(ref.id);
+      await updateDoc(doc(db, "investigadores", ref.id), {
+        id_investigador: newId,
+        updatedAt: serverTimestamp(),
+      });
+
+      // listo
+      resetForm();
+      setShowCreate(false);
+    } catch (e) {
+      console.error(e);
+      setErr("Error creando integrante. Revisa consola/logs.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const th = { textAlign: "left", borderBottom: "1px solid #eee", padding: 8 };
+  const td = { borderBottom: "1px solid #f3f3f3", padding: 8, fontSize: 14 };
+
+  const input = {
+    width: "100%",
+    padding: 10,
+    borderRadius: 10,
+    border: "1px solid rgba(0,0,0,0.15)",
+    outline: "none",
+  };
 
   return (
     <div style={{
@@ -645,17 +765,135 @@ function AdminIntegrantesModal({ open, onClose, integrantes, onToggle }) {
     }}>
       <div style={{
         background: "white",
-        width: 720,
+        width: 820,
         maxWidth: "95vw",
         borderRadius: 16,
         padding: 16
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, color: "#1B75BC" }}>Administrar integrantes</h3>
-          <button onClick={onClose} style={{ fontWeight: 900 }}>X</button>
+          <button onClick={() => { setShowCreate(false); resetForm(); onClose(); }} style={{ fontWeight: 900 }}>X</button>
         </div>
 
-        <div style={{ marginTop: 12, maxHeight: "70vh", overflowY: "auto" }}>
+        {/* Crear integrante (seguro) */}
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={() => { setShowCreate(s => !s); setErr(""); }}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(45,156,219,0.35)",
+              background: "rgba(27,117,188,0.08)",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            {showCreate ? "Ocultar formulario" : "+ Nuevo integrante"}
+          </button>
+
+          {showCreate && (
+            <div style={{
+              marginTop: 12,
+              padding: 12,
+              borderRadius: 12,
+              border: "1px solid rgba(45,156,219,0.25)",
+              background: "rgba(45,156,219,0.04)"
+            }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <input style={input} placeholder="Nombres *"
+                  value={form.nombres}
+                  onChange={(e)=>setForm(s=>({...s, nombres:e.target.value}))}
+                />
+                <input style={input} placeholder="Apellidos *"
+                  value={form.apellidos}
+                  onChange={(e)=>setForm(s=>({...s, apellidos:e.target.value}))}
+                />
+                <input style={input} placeholder="Email"
+                  value={form.email}
+                  onChange={(e)=>setForm(s=>({...s, email:e.target.value}))}
+                />
+                <input style={input} placeholder="Identificación"
+                  value={form.identificacion}
+                  onChange={(e)=>setForm(s=>({...s, identificacion:e.target.value}))}
+                />
+                <input style={input} placeholder="Género"
+                  value={form.genero}
+                  onChange={(e)=>setForm(s=>({...s, genero:e.target.value}))}
+                />
+                <input style={input} placeholder="Año vinculación (Ej: 2022)"
+                  value={form.anio_vinculacion}
+                  onChange={(e)=>setForm(s=>({...s, anio_vinculacion:e.target.value}))}
+                />
+
+                <select style={input}
+                  value={form.categoria_minciencias_investigador}
+                  onChange={(e)=>setForm(s=>({...s, categoria_minciencias_investigador:e.target.value}))}
+                >
+                  <option value="IE">IE - Investigador Emérito</option>
+                  <option value="IS">IS - Investigador Senior</option>
+                  <option value="IA">IA - Investigador Asociado</option>
+                  <option value="IJ">IJ - Investigador Junior</option>
+                  <option value="SC">SC - Sin categoría</option>
+                </select>
+
+                <select style={input}
+                  value={form.activo ? "1" : "0"}
+                  onChange={(e)=>setForm(s=>({...s, activo: e.target.value === "1"}))}
+                >
+                  <option value="1">Activo</option>
+                  <option value="0">Inactivo</option>
+                </select>
+              </div>
+
+              {err && <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 700 }}>{err}</div>}
+
+              <div style={{ marginTop: 12, display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowCreate(false); resetForm(); }}
+                  disabled={saving}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                    background: "white",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                    opacity: saving ? 0.6 : 1
+                  }}
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={createIntegrante}
+                  disabled={saving}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(45,156,219,0.35)",
+                    background: "#1B75BC",
+                    color: "white",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                    opacity: saving ? 0.6 : 1
+                  }}
+                >
+                  {saving ? "Guardando..." : "Guardar integrante"}
+                </button>
+              </div>
+
+              <div style={{ marginTop: 10, fontSize: 12, color: "#4A5568" }}>
+                * El <b>id_investigador</b> se genera automáticamente.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tabla administración */}
+        <div style={{ marginTop: 12, maxHeight: "55vh", overflowY: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
@@ -672,7 +910,7 @@ function AdminIntegrantesModal({ open, onClose, integrantes, onToggle }) {
                 return (
                   <tr key={inv._docId}>
                     <td style={td}>{nombre}</td>
-                    <td style={td}>{inv.id || "—"}</td>
+                    <td style={td}>{inv.id || inv.id_investigador || "—"}</td>
                     <td style={td}><b>{activo ? "Activo" : "Inactivo"}</b></td>
                     <td style={td}>
                       <button
@@ -698,7 +936,7 @@ function AdminIntegrantesModal({ open, onClose, integrantes, onToggle }) {
 
         <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
           <button
-            onClick={onClose}
+            onClick={() => { setShowCreate(false); resetForm(); onClose(); }}
             style={{
               padding: "10px 12px",
               borderRadius: 12,
