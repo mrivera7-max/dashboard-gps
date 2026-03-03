@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   collection, query, where, orderBy, onSnapshot,
-  getDocs, documentId
+  doc, updateDoc, serverTimestamp
 } from "firebase/firestore";
+
 import { db } from "./firebaseConfig"; // ajusta tu import
 
 import {
@@ -135,6 +136,7 @@ export default function IntegrantesAdminView() {
   const [selectedIntegrante, setSelectedIntegrante] = useState(null);
   const [soloActivos, setSoloActivos] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState(null);
+  const [adminOpen, setAdminOpen] = useState(false);
   
 
   // 1) Cargar integrantes activos
@@ -367,6 +369,21 @@ useEffect(() => {
     return { filas, cols, M, rowTotals, colTotals, grandTotal };
   }, [productos]);
 
+  const isAdmin = true; // temporal mientras conectas roles reales
+
+  const toggleActivo = async (inv) => {
+    if (!inv?._docId) return;
+
+    const nextActivo = !Boolean(inv.activo);
+
+    await updateDoc(doc(db, "investigadores", inv._docId), {
+      activo: nextActivo,
+      estado_investigador: nextActivo ? "Activo" : "Inactivo",
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  
   // UI mínima (ajústala a tu estilo)
   return (
       <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
@@ -380,7 +397,29 @@ useEffect(() => {
           boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
         }}
       >
-        <h3>{soloActivos ? "Integrantes activos" : "Integrantes"}</h3>
+      
+      <h3>{soloActivos ? "Integrantes activos" : "Integrantes"}</h3>
+
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={() => setAdminOpen(true)}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid rgba(45,156,219,0.35)",
+            background: "rgba(27,117,188,0.08)",
+            fontWeight: 900,
+            cursor: "pointer",
+            marginBottom: 10,
+          }}
+        >
+          Administrar integrantes
+        </button>
+      )}
+
+        
 
       <div style={{ marginBottom: 10 }}>
         <label style={{ fontSize: 13, fontWeight: 600 }}>
@@ -571,7 +610,14 @@ useEffect(() => {
           </>
         )}
       </div>
-      </div>
+      {/* Modal administración */}
+      <AdminIntegrantesModal
+        open={adminOpen}
+        onClose={() => setAdminOpen(false)}
+        integrantes={integrantes}
+        onToggle={toggleActivo}
+      />
+    </div>
   );
 }
 
@@ -586,4 +632,87 @@ function KpiCard({ title, value }) {
 
 const th = { textAlign: "left", borderBottom: "1px solid #eee", padding: 8 };
 const td = { borderBottom: "1px solid #f3f3f3", padding: 8, fontSize: 14 };
+
+function AdminIntegrantesModal({ open, onClose, integrantes, onToggle }) {
+  if (!open) return null;
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0,
+      background: "rgba(0,0,0,0.45)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 9999
+    }}>
+      <div style={{
+        background: "white",
+        width: 720,
+        maxWidth: "95vw",
+        borderRadius: 16,
+        padding: 16
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0, color: "#1B75BC" }}>Administrar integrantes</h3>
+          <button onClick={onClose} style={{ fontWeight: 900 }}>X</button>
+        </div>
+
+        <div style={{ marginTop: 12, maxHeight: "70vh", overflowY: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={th}>Nombre</th>
+                <th style={th}>ID</th>
+                <th style={th}>Estado</th>
+                <th style={th}>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {integrantes.map(inv => {
+                const nombre = `${inv.apellidos || ""} ${inv.nombres || ""}`.trim() || "—";
+                const activo = !!inv.activo;
+                return (
+                  <tr key={inv._docId}>
+                    <td style={td}>{nombre}</td>
+                    <td style={td}>{inv.id || "—"}</td>
+                    <td style={td}><b>{activo ? "Activo" : "Inactivo"}</b></td>
+                    <td style={td}>
+                      <button
+                        onClick={() => onToggle(inv)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(45,156,219,0.35)",
+                          background: activo ? "#fff7ed" : "#ecfeff",
+                          fontWeight: 900,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {activo ? "Desactivar" : "Activar"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(0,0,0,0.2)",
+              background: "white",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
