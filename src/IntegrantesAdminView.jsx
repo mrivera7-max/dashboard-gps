@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  collection, query, where, orderBy, onSnapshot,
-  getDocs, addDoc, doc, updateDoc, serverTimestamp
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  getDocs,
+  addDoc,
+  doc,
+  updateDoc,
+  runTransaction,
+  serverTimestamp
 } from "firebase/firestore";
 
-import { db } from "./firebaseConfig"; // ajusta tu import
+import { db } from "./firebaseConfig"; 
 
 import {
   ResponsiveContainer,
@@ -148,7 +157,17 @@ export default function IntegrantesAdminView() {
   const [soloActivos, setSoloActivos] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [liderDocId, setLiderDocId] = useState(null);
   
+  // cambiar de lider
+  useEffect(() => {
+  const ref = doc(db, "config", "grupoGPS");
+  const unsub = onSnapshot(ref, (snap) => {
+    setLiderDocId(snap.exists() ? snap.data().liderDocId || null : null);
+  });
+  return () => unsub();
+}, []);
+
 
   // 1) Cargar integrantes activos
   useEffect(() => {
@@ -627,6 +646,8 @@ useEffect(() => {
         onClose={() => setAdminOpen(false)}
         integrantes={integrantes}
         onToggle={toggleActivo}
+        liderDocId={liderDocId}
+        onSetLider={setLider}
       />
     </div>
   );
@@ -644,7 +665,7 @@ function KpiCard({ title, value }) {
 const th = { textAlign: "left", borderBottom: "1px solid #eee", padding: 8 };
 const td = { borderBottom: "1px solid #f3f3f3", padding: 8, fontSize: 14 };
 
-function AdminIntegrantesModal({ open, onClose, integrantes, onToggle }) {
+function AdminIntegrantesModal({ open, onClose, integrantes, onToggle, liderDocId, onSetLider }) {
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -660,6 +681,7 @@ function AdminIntegrantesModal({ open, onClose, integrantes, onToggle }) {
     activo: true,
   });
 
+  
   if (!open) return null;
 
   const isEmailValid = (email) => {
@@ -900,32 +922,60 @@ function AdminIntegrantesModal({ open, onClose, integrantes, onToggle }) {
                 <th style={th}>Nombre</th>
                 <th style={th}>ID</th>
                 <th style={th}>Estado</th>
+                <th style={th}>Líder</th>
                 <th style={th}>Acción</th>
               </tr>
             </thead>
             <tbody>
-              {integrantes.map(inv => {
+              {integrantes.map((inv) => {
                 const nombre = `${inv.apellidos || ""} ${inv.nombres || ""}`.trim() || "—";
                 const activo = !!inv.activo;
+                const esLider = inv._docId === liderDocId;
+
                 return (
                   <tr key={inv._docId}>
                     <td style={td}>{nombre}</td>
                     <td style={td}>{inv.id || inv.id_investigador || "—"}</td>
                     <td style={td}><b>{activo ? "Activo" : "Inactivo"}</b></td>
+
+                    {/* COLUMNA LÍDER */}
                     <td style={td}>
-                      <button
-                        onClick={() => onToggle(inv)}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 10,
-                          border: "1px solid rgba(45,156,219,0.35)",
-                          background: activo ? "#fff7ed" : "#ecfeff",
-                          fontWeight: 900,
-                          cursor: "pointer",
-                        }}
-                      >
-                        {activo ? "Desactivar" : "Activar"}
-                      </button>
+                      {esLider ? <b style={{ color: "#1B75BC" }}>Líder actual</b> : "—"}
+                    </td>
+
+                    {/* COLUMNA ACCIÓN */}
+                    <td style={td}>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          onClick={() => onToggle(inv)}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 10,
+                            border: "1px solid rgba(45,156,219,0.35)",
+                            background: activo ? "#fff7ed" : "#ecfeff",
+                            fontWeight: 900,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {activo ? "Desactivar" : "Activar"}
+                        </button>
+
+                        <button
+                          disabled={!activo || esLider}
+                          onClick={() => onSetLider(inv._docId)}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 10,
+                            border: "1px solid rgba(45,156,219,0.35)",
+                            background: esLider ? "#eef2ff" : "white",
+                            fontWeight: 900,
+                            cursor: (!activo || esLider) ? "not-allowed" : "pointer",
+                            opacity: (!activo || esLider) ? 0.6 : 1,
+                          }}
+                        >
+                          {esLider ? "Líder actual" : "Hacer líder"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -953,4 +1003,31 @@ function AdminIntegrantesModal({ open, onClose, integrantes, onToggle }) {
     </div>
   );
 }
+
+const setLider = async (nuevoLiderDocId) => {
+  if (!nuevoLiderDocId) return;
+
+  await runTransaction(db, async (tx) => {
+    const cfgRef = doc(db, "config", "grupoGPS");
+    const cfgSnap = await tx.get(cfgRef);
+
+    const invRef = doc(db, "investigadores", nuevoLiderDocId);
+    const invSnap = await tx.get(invRef);
+
+    if (!invSnap.exists()) throw new Error("Investigador no existe");
+    const inv = invSnap.data();
+    if (!inv.activo) throw new Error("Solo puedes asignar líder a un integrante ACTIVO");
+
+    // si config no existe, lo creas
+    const prev = cfgSnap.exists() ? (cfgSnap.data().liderDocId || null) : null;
+
+    if (prev === nuevoLiderDocId) return; // ya es líder
+
+    tx.set(cfgRef, {
+      liderDocId: nuevoLiderDocId,
+      updatedAt: serverTimestamp(),
+      // updatedBy: auth.currentUser?.uid ?? null, // opcional
+    }, { merge: true });
+  });
+};
 
