@@ -106,7 +106,12 @@ export default function App() {
 
   const selectedRole = useMemo(() => {
     if (!user || !cfgLoaded) return null;
-    if (roleSelected === "admin" && !isLeader) return "docente";
+
+    // Si pidió admin pero no es líder → forzar docente
+    if (roleSelected === "admin" && !isLeader) {
+      return "docente";
+    }
+
     return roleSelected;
   }, [user, cfgLoaded, roleSelected, isLeader]);
 
