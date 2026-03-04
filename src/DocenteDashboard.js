@@ -15,7 +15,10 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  getDocs,
+  limit
 } from "firebase/firestore";
+
 
 const UDI_BLUE = "#2D9CDB";
 const UDI_BLUE_DARK = "#1B75BC";
@@ -24,6 +27,14 @@ const SYSTEM = {
   version: "v1.0",
   year: String(new Date().getFullYear()),
   group: "Grupo de Investigación GPS",
+};
+
+const categoriaMincienciasMap = {
+  IE: "Investigador Emérito",
+  IS: "Investigador Senior",
+  IA: "Investigador Asociado",
+  IJ: "Investigador Junior",
+  SC: "Sin Categoría"
 };
 
 export default function DocenteDashboard({ logout }) {
@@ -41,11 +52,90 @@ export default function DocenteDashboard({ logout }) {
   const [perfilErr, setPerfilErr] = useState("");
 
   useEffect(() => {
+    if (!uid) return;
+
+    const emailLower = (auth.currentUser?.email || "").toLowerCase().trim();
+    if (!emailLower) return;
+
+     (async () => {
+        try {
+          const refInv = collection(db, "investigadores");
+          const qInv = query(refInv, where("email", "==", emailLower), limit(1));
+          const snap = await getDocs(qInv);
+
+          if (snap.empty) return; // no está registrado como investigador aún
+
+          const inv = snap.docs[0].data();
+
+          // Normaliza estado
+          const estadoInv = String(inv.estado_investigador || "").toLowerCase();
+          const esActivo = estadoInv.includes("activo") || inv.activo === true;
+
+          await setDoc(
+            doc(db, "usuarios", uid),
+            {
+              // campos que quieres ver en Perfil docente
+              nombres: inv.nombres || "",
+              apellidos: inv.apellidos || "",
+              identificacion: inv.identificacion || "",
+              genero: inv.genero || "",
+              categoria_minciencias: inv.categoria_minciencias_investigador || "",
+              estado: esActivo ? "activo" : "pendiente",
+
+              // de paso guardas el email institucional
+              correo: emailLower,
+
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        } catch (e) {
+          console.error("SYNC investigadores->usuarios error:", e);
+        }
+      })();
+  }, [uid]);
+
+  useEffect(() => {
   if (!uid) return;
 
   const ref = doc(db, "usuarios", uid);
 
-  const unsub = onSnapshot(
+  const syncFromInvestigadores = async () => {
+    try {
+    const emailLower = (auth.currentUser?.email || "").toLowerCase().trim();
+    console.log("[SYNC] emailLower:", emailLower);
+    if (!emailLower) return;
+
+    const refInv = collection(db, "investigadores");
+    const qInv = query(refInv, where("email", "==", emailLower), limit(1));
+    const invSnap = await getDocs(qInv);
+
+    console.log("[SYNC] invSnap.empty:", invSnap.empty, "size:", invSnap.size);
+
+    if (invSnap.empty) {
+      console.warn("[SYNC] No encontró investigador con email =", emailLower);
+      return; // aún no existe en investigadores
+    }
+
+    const inv = invSnap.docs[0].data();
+     console.log("[SYNC] inv encontrado:", invSnap.docs[0].id, inv);
+
+    await updateDoc(doc(db, "usuarios", uid), {
+      nombres: inv.nombres || "",
+      apellidos: inv.apellidos || "",
+      identificacion: inv.identificacion || "",
+      categoria_minciencias: categoriaMincienciasMap[inv.categoria_minciencias_investigador] || "",
+      estado: (inv.estado_investigador || "").toLowerCase() || "pendiente",
+      updatedAt: serverTimestamp(),
+    });
+     console.log("[SYNC] ✅ usuarios actualizado");
+    } catch (e) {
+      console.error("[SYNC] ❌ error:", e);
+    }
+
+  };
+
+    const unsub = onSnapshot(
     ref,
     async (snap) => {
       if (!snap.exists()) {
@@ -59,7 +149,7 @@ export default function DocenteDashboard({ logout }) {
             photoURL: auth.currentUser?.photoURL || "",
             rol: "docente",
             estado: "pendiente",
-
+            
             // conexiones iniciales para que nunca sean undefined
             conexiones: {
               academicas: {
@@ -90,6 +180,7 @@ export default function DocenteDashboard({ logout }) {
 
       setPerfilErr("");
       setPerfil(snap.data());
+      await syncFromInvestigadores();
     },
     (err) => {
       console.error(err);
@@ -339,7 +430,7 @@ function PerfilDocente({ perfil, emailFallback }) {
         </Card>
       </div>
 
-      <Card title="Perfil académico (editable)">
+      <Card title="Perfil académico">
         <div style={{ display: "grid", gap: 10 }}>
           <textarea
             value={perfilTxt}

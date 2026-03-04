@@ -83,27 +83,37 @@ exports.syncSheets = onCall({ region: "us-central1" },async (request) => {
   try {
   
   
-  // Auth
-  if (!request.auth || !request.auth.token || !request.auth.token.email) {
+  // ===== AUTH + PERMISOS =====
+  if (!request.auth?.token?.email) {
     throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
   }
 
-  const email = request.auth.token.email;
-  if (!email.endsWith("@udi.edu.co")) {
+  
+  const emailLower = String(request.auth.token.email).toLowerCase().trim();
+
+  if (!emailLower.endsWith("@udi.edu.co")) {
     throw new HttpsError("permission-denied", "Solo correo institucional.");
   }
 
-  // Rol
-  const userDoc = await db.collection("usuarios").doc(email).get();
-  const rol = userDoc.exists ? userDoc.data().rol : null;
-  if (rol !== "admin") {
-    throw new HttpsError("permission-denied", "Solo admin puede sincronizar.");
+  // Líder (fuente de verdad)
+  const cfgSnap = await db.collection("config").doc("grupoGPS").get();
+  const liderEmail = String(cfgSnap.data()?.liderEmail || "").toLowerCase().trim();
+
+  if (!liderEmail) {
+    throw new HttpsError("failed-precondition", "No hay líder configurado en config/grupoGPS.");
+  }
+
+  const isLeader = emailLower === liderEmail;
+
+  if (!isLeader) {
+    throw new HttpsError("permission-denied", "Solo el líder del grupo puede sincronizar.");
   }
 
    console.log("SA running, project:", process.env.GCLOUD_PROJECT);
 
   console.log("1) leyendo usuarios...");
-  const testUser = await db.collection("usuarios").doc(email).get();
+  const uid = request.auth?.uid;   // <-- obtener UID del usuario autenticado
+  const testUser = await db.collection("usuarios").doc(uid).get();
   console.log("1) ok usuarios read, exists:", testUser.exists);
 
   console.log("2) escribiendo test...");
@@ -131,7 +141,7 @@ const productosRes = await syncTabToCollection({
     throw new Error(`Fila sin id_producto (row ${rowIndex}) en PRODUCTOS`);
   }
 
-  const docId = makeId("prod", idProducto);           // ID estable
+  const docId = idProducto;           // ID estable
   const sourceKey = `id_producto:${idProducto}`;
 
   const data = {
@@ -194,9 +204,7 @@ const investigadoresRes = await syncTabToCollection({
     const ident = (obj["identificacion"] || obj["id"] || "").trim();
 
     // ID estable
-    const key = idInv || ident || emailInv || `row:${rowIndex}`;
-    const docId = makeId("inv", key);
-
+        
     const estadoRaw = pick(obj, ["estado_investigador"]);
     const estado = (estadoRaw || "pendiente").toString().trim().toLowerCase();
 
@@ -233,7 +241,7 @@ const proyectosRes = await syncTabToCollection({
   const nombre = obj["nombre_proyecto"] || obj["titulo"] || "";
 
   const key = idProy || codigo || `row:${rowIndex}|${norm(nombre)}`;
-  const docId = makeId("proy", key);
+  const docId = idProy || codigo;
 
   const linea = (obj["linea_investigacion"] || obj["linea_investigación"] || "N/A").toString().trim();
 
