@@ -56,9 +56,17 @@ async function syncTabToCollection({
     const newHash = sha1(data);
 
     const prev = await ref.get();
-    if (!prev.exists) created++;
-    else if ((prev.data().hash || null) !== newHash) updated++;
-    else { skipped++; continue; }
+    if (!prev.exists) {
+      skipped++;
+      continue;
+    }
+
+    if ((prev.data().hash || null) === newHash) {
+      skipped++;
+      continue;
+    }
+
+    updated++;
 
     batch.set(ref, {
       ...data,
@@ -222,6 +230,14 @@ const investigadoresRes = await syncTabToCollection({
       estado_investigador: estado,                 // activo|inactivo|pendiente
       activo: estado === "activo",                 // boolean
       categoria_minciencias_investigador: cat,     // IE|IS|IA|IJ|SC
+      anio_vinculacion: Number(obj["anio_vinculacion"] || 0),
+      mes_vinculacion: (obj["mes_vinculacion"] || "").toString().trim(),
+      fin_vinculacion: Number(obj["fin_vinculacion"] || 0),
+      mes_fin_vinculacion: (obj["mes_fin_vinculacion"] || "").toString().trim(),
+      rol: (obj["rol"] || "").toString().trim(),
+      nivel_formacion: (obj["nivel_formacion"] || "").toString().trim(),
+      h_dedica: Number(obj["h_dedica"] || 0),
+      genero: (obj["genero"] || "").toString().trim(),
       synced_at: admin.firestore.FieldValue.serverTimestamp(),
     };
 
@@ -241,7 +257,7 @@ const proyectosRes = await syncTabToCollection({
   const nombre = obj["nombre_proyecto"] || obj["titulo"] || "";
 
   const key = idProy || codigo || `row:${rowIndex}|${norm(nombre)}`;
-  const docId = idProy || codigo;
+  const docId = (idProy || codigo || makeId("proy", key)).trim();
 
   const linea = (obj["linea_investigacion"] || obj["linea_investigación"] || "N/A").toString().trim();
 
