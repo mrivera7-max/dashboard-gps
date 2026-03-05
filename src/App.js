@@ -105,10 +105,10 @@ export default function App() {
   };
 
   const selectedRole = useMemo(() => {
-    if (!user || !cfgLoaded) return null;
+    if (!user) return null;
 
     // Si pidió admin pero no es líder → forzar docente
-    if (roleSelected === "admin" && !isLeader) {
+    if (roleSelected === "admin" && cfgLoaded && !isLeader) {
       return "docente";
     }
 
@@ -124,10 +124,6 @@ export default function App() {
   roleUI: role,
   savedRole: localStorage.getItem("gps_role_selected"),
 });
-
-  if (user && !cfgLoaded) {
-    return <div style={{ padding: 24 }}>Cargando configuración...</div>;
-  }
 
   return !user ? (
     <div style={styles.page}>
@@ -165,7 +161,7 @@ export default function App() {
               text="Líder de Grupo"
               active={role === "admin"}
               onClick={() => setRole("admin")}
-              disabled={!cfgLoaded}
+              disabled={loading}
             />
           </div>
 

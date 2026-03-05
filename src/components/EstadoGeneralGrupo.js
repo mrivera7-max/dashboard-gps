@@ -3,6 +3,7 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import {
   ResponsiveContainer,
+  ComposedChart,
   LineChart, Line,
   BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -32,7 +33,7 @@ const CAT_KEYS = {
 const CAT_COLORS = {
   NC: "#0B3C5D",   // azul oceano
   DT: "#1F77B4",   // azul marino
-  ASC: "#2C7FB8",  // azul medio
+  ASC: "#1a204e",  // azul medio
   DIV: "#1FA187",  // verde mar
   FRH: "#17BECF",  // turquesa
 };
@@ -86,11 +87,30 @@ const normTipoProducto = (v) => {
   return s ? s : "Sin tipo";
 };
 
+const isActivoInv = (i) => {
+  const v = i?.activo;
+  if (v === true || String(v).trim().toLowerCase() === "true") return true;
+
+  // solo fallback si activo no está definido (null/undefined/"")
+  if (v === undefined || v === null || String(v).trim() === "") {
+    const e = String(i?.estado_investigador ?? "").trim().toLowerCase();
+    return e === "activo";
+  }
+  return false;
+};
+
 // ===================== loader =====================
 async function loadEstadoGeneral() {
   // ===== 1) INVESTIGADORES primero (porque productos lo necesita) =====
   const invSnap = await getDocs(collection(db, "investigadores"));
-
+  const prodSnap = await getDocs(collection(db, "productos"));
+  const prodByYear = {};
+  prodSnap.forEach((d) => {
+    const p = d.data();
+    const y = Number(p.anio || 0);
+    if (y > 0) prodByYear[y] = (prodByYear[y] || 0) + 1;
+  });
+  
   const invMap = {}; // id -> { activo, cat }
   const invByCatActivos = init(CATS_INV);
   let invActivos = 0;
@@ -98,7 +118,7 @@ async function loadEstadoGeneral() {
   invSnap.forEach((d) => {
     const i = d.data();
     const id = (i.id_investigador || d.id || "").toString().trim();
-    const activo = i.activo === true;
+    const activo = isActivoInv(i);
     const cat = normInvCat(i.categoria_minciencias_investigador);
 
     invMap[id] = { activo, cat };
@@ -109,21 +129,30 @@ async function loadEstadoGeneral() {
     }
   });
 
-  // ===== 2) PRODUCTOS =====
-  const prodSnap = await getDocs(collection(db, "productos"));
+      // ===== 1B) Evolución de vinculación (activos) =====
+    const invVincByYear = {};
+    invSnap.forEach((d) => {
+      const i = d.data();
+      const y = Number(i.anio_vinculacion || 0); // ya lo tienes definido arriba
+      if (y > 0) invVincByYear[y] = (invVincByYear[y] || 0) + 1;
+    });
 
-  const prodByYear = {};
+  const vinculacionPorAno = Object.keys(invVincByYear)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((y) => ({ year: String(y), total: invVincByYear[y] }));
+
+  const vincuUltimos10 = vinculacionPorAno.slice(-10);
+
+  // ===== 2) PRODUCTOS =====
+  
   const prodByCat = init([...CATS_PRODUCTO_SIN_NA, "N/A"]);
-  const prodByYearCat = {}; // year -> {NC,DT,ASC,DIV,FRH}
+  
   const matrizTipoCat = {}; // tipo -> {NC,DT,ASC,DIV,FRH}
   const tiposSet = new Set();
 
+  const prodByYearCat = {}; // year -> {NC,DT,ASC,DIV,FRH}
   // Primero: conteo por año (para definir últimos 10)
-  prodSnap.forEach((d) => {
-    const p = d.data();
-    const y = Number(p.anio || 0);
-    if (y > 0) prodByYear[y] = (prodByYear[y] || 0) + 1;
-  });
 
   const produccionPorAno = Object.keys(prodByYear)
     .map(Number)
@@ -182,6 +211,8 @@ async function loadEstadoGeneral() {
     });
   });
 
+  
+
   // Distribución global (ordenada)
   const distribucionCategorias = CATS_PRODUCTO_SIN_NA
     .map((cat) => ({
@@ -228,6 +259,30 @@ async function loadEstadoGeneral() {
     indice_dt_nc: totNC ? Number((totDT / totNC).toFixed(2)) : null,
   };
 
+ 
+// investigadores activos por año (según año_vinculacion)
+ 
+// acumulado de investigadores activos
+
+ const currentYear = new Date().getFullYear();
+  const startYear = currentYear - 9;
+
+  // ✅ usa invVincByYear (activos por año de vinculación) ya calculado arriba
+  
+const produccionVsTalento = Array.from({ length: 10 }, (_, idx) => {
+  const y = startYear + idx;
+  
+  return {
+    year: String(y),
+    productos: prodByYear[y] || 0,
+    investigadores: invVincByYear[y] || 0,
+  };
+});
+
+  const productividadPromedio = invActivos > 0
+      ? Number((totalSinNA / invActivos).toFixed(2))
+      : 0;
+
   // Investigadores activos por año/categoría (todos los años disponibles)
   const invByYearCatActivos = {};
   Object.keys(invActivosPorAnoCat).forEach((yy) => {
@@ -250,7 +305,19 @@ async function loadEstadoGeneral() {
   const investigadoresActivosPorCategoria = CATS_INV.map((cat) => ({
     categoria: cat,
     total: invByCatActivos[cat] ?? 0,
+
   }));
+
+  const PESOS_MADUREZ = { IE: 5, IS: 4, IA: 3, IJ: 2, SC: 1 };
+
+  const sumaPonderada = CATS_INV.reduce(
+    (acc, c) => acc + (invByCatActivos[c] || 0) * (PESOS_MADUREZ[c] || 1),
+    0
+  );
+
+  const indiceMadurez = invActivos > 0
+    ? Number((sumaPonderada / invActivos).toFixed(2))
+    : 0;
 
     // ============ PROYECTOS ============
   const proySnap = await getDocs(collection(db, "proyectos"));
@@ -299,7 +366,9 @@ async function loadEstadoGeneral() {
     total: proyByLinea[linea] ?? 0,
   }));
 
-  return {
+  
+
+   return {
     productos: { total: prodSnap.size, porCategoria: prodByCat },
     investigadores: {
       total: invSnap.size,
@@ -323,6 +392,13 @@ async function loadEstadoGeneral() {
       proyectosPorLinea,
       proyectosPorLineaPie,
       proyectosPorLineaPorAno,
+      produccionVsTalento,
+      vinculacionPorAno,
+      vinculacionUltimos10: vincuUltimos10,
+      kpisTalento: {
+        productividad_promedio: productividadPromedio,
+        indice_madurez: indiceMadurez,
+      },
     },
   };
 }
@@ -374,7 +450,7 @@ const placeholder = {
 };
 
 // ===================== componente =====================
-export default function EstadoGeneralGrupo(refreshKey) {
+export default function EstadoGeneralGrupo({ refreshKey }) {
   const [kpis, setKpis] = useState(null);
   const [err, setErr] = useState("");
 
@@ -388,7 +464,7 @@ export default function EstadoGeneralGrupo(refreshKey) {
   }, [refreshKey]);
 
   if (err) return <div style={{ color: "#b91c1c", fontWeight: 900 }}>{err}</div>;
-  if (!kpis) return <div>Cargando KPIs…</div>;
+  if (!kpis) return <div>Cargando Indicadores…</div>;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -412,6 +488,17 @@ export default function EstadoGeneralGrupo(refreshKey) {
         <div style={row}>
           <div><b>Total:</b> {kpis.investigadores.total}</div>
           <div><b>Activos:</b> {kpis.investigadores.activos}</div>
+            <div style={grid4}>
+              <div style={miniCard}>
+                <div style={miniTitle}>Productividad promedio (productos/investigador activo)</div>
+                <div style={miniValue}>{kpis.charts.kpisTalento.productividad_promedio}</div>
+              </div>
+
+              <div style={miniCard}>
+                <div style={miniTitle}>Índice de madurez investigativa</div>
+                <div style={miniValue}>{kpis.charts.kpisTalento.indice_madurez}</div>
+              </div>
+            </div>
         </div>
         <div style={grid5}>
           {CATS_INV.map((c) => (
@@ -634,24 +721,37 @@ export default function EstadoGeneralGrupo(refreshKey) {
         </div>
 
 
-        <h3 style={h3}>Tendencia del talento investigador activo</h3>
-        <div style={{ width: "100%", height: 360 }}>
-          <ResponsiveContainer>
-            <BarChart data={kpis.charts.invActivosPorAnoCategoria} margin={{ bottom: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="year" angle={-30} textAnchor="end" interval={0} />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Legend />
+        <h3 style={h3}>Evolución de la producción científica y talento investigador</h3>
+        <ResponsiveContainer width="100%" height={320}>
+          <ComposedChart data={kpis.charts.produccionVsTalento}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="year" />
+            
+            <YAxis yAxisId="left" allowDecimals={false} />
+            <YAxis yAxisId="right" orientation="right" allowDecimals={false} />
 
-              <Bar dataKey="IE" stackId="a" name="IE" fill={INV_COLORS.IE} />
-              <Bar dataKey="IS" stackId="a" name="IS" fill={INV_COLORS.IS} />
-              <Bar dataKey="IA" stackId="a" name="IA" fill={INV_COLORS.IA} />
-              <Bar dataKey="IJ" stackId="a" name="IJ" fill={INV_COLORS.IJ} />
-              <Bar dataKey="SC" stackId="a" name="SC" fill={INV_COLORS.SC} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+            <Tooltip />
+            <Legend />
+
+            <Bar
+              yAxisId="left"
+              dataKey="productos"
+              name="Productos científicos"
+              fill="#2D9CDB"
+              barSize={28}
+            />
+
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="investigadores"
+              name="Investigadores activos"
+              stroke="#EB5757"
+              strokeWidth={3}
+              dot={{ r: 4 }}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
       </section>
 
 

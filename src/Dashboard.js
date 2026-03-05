@@ -69,7 +69,7 @@ export default function Dashboard({ logout }) {
       },
       (err) => {
         console.error(err);
-        setKpiError(err?.message || "Error leyendo KPIs");
+        setKpiError(err?.message || "Error leyendo Indicadores");
       }
     );
 
@@ -91,7 +91,7 @@ export default function Dashboard({ logout }) {
         return;
       }
       if (role !== "admin") {
-        setMsg("No tienes permisos para recalcular KPIs.");
+        setMsg("No tienes permisos para recalcular Indicadores.");
         return;
       }
 
@@ -101,11 +101,11 @@ export default function Dashboard({ logout }) {
 
       // Si tu function retorna {status:"ok"} esto queda perfecto
       const status = res?.data?.status;
-      setMsg(status === "ok" ? "Listo ✅ KPIs actualizados" : "Listo ✅");
+      setMsg(status === "ok" ? "Listo ✅ Indicadores actualizados" : "Listo ✅");
       setEstadoRefresh((x) => x + 1);
     } catch (e) {
       console.error(e);
-      setMsg(e?.message || "Error recalculando KPIs");
+      setMsg(e?.message || "Error recalculando Indicadores");
     }
   };
 
@@ -223,9 +223,9 @@ export default function Dashboard({ logout }) {
               onClick={recalcular}
               style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
               disabled={authLoading}
-              title={authLoading ? "Cargando sesión…" : "Recalcular KPIs"}
+              title={authLoading ? "Cargando sesión…" : "Recalcular Indicadores"}
             >
-              Recalcular KPIs
+              Recalcular Indicadores
             </button>
             <div style={styles.msg}>{msg}</div>
           </div>

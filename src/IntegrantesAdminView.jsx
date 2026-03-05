@@ -517,7 +517,7 @@ useEffect(() => {
             
             {/* KPIs */}
             <div style={sectionCard}>
-              <h4 style={sectionTitle}>KPIs del investigador</h4>
+              <h4 style={sectionTitle}>Indicador del investigador</h4>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <KpiCard title="Productos" value={kpis.totalProductos} />
                 <KpiCard title="Proyectos" value={kpis.totalProyectos} />
