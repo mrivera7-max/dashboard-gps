@@ -28,54 +28,87 @@ function makeId(prefix, key) {
 async function syncTabToCollection({
   sheets,
   spreadsheetId,
-  tabName,          // ej: "PRODUCTOS"
-  collectionName,   // ej: "productos"
-  buildDoc,         // (obj, rowIndex) => ({ docId, data })
+  tabName,
+  collectionName,
+  buildDoc,
 }) {
   const range = `'${tabName}'!A1:Z`;
   const resp = await sheets.spreadsheets.values.get({ spreadsheetId, range });
 
   const rows = resp.data.values || [];
-  if (rows.length < 2) return { created: 0, updated: 0, skipped: 0, totalRows: rows.length - 1 };
+  if (rows.length < 2) {
+    return { created: 0, updated: 0, skipped: 0, totalRows: 0 };
+  }
 
   const headers = rows.shift().map((h) => norm(h));
 
-  let created = 0, updated = 0, skipped = 0;
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+
   let batch = db.batch();
   let ops = 0;
 
   for (let idx = 0; idx < rows.length; idx++) {
     const r = rows[idx];
     const obj = {};
-    headers.forEach((h, i) => (obj[h] = r[i] ?? ""));
+    headers.forEach((h, i) => {
+      obj[h] = r[i] ?? "";
+    });
 
-    const rowIndex = idx + 2; // porque datos empiezan en fila 2
+    const rowIndex = idx + 2;
     const { docId, data } = buildDoc(obj, rowIndex);
+
+    if (!docId) {
+      console.warn(`[${tabName}] fila ${rowIndex} sin docId`);
+      skipped++;
+      continue;
+    }
 
     const ref = db.collection(collectionName).doc(docId);
     const newHash = sha1(data);
-
     const prev = await ref.get();
+
     if (!prev.exists) {
-      skipped++;
-      continue;
+      created++;
+
+      batch.set(
+        ref,
+        {
+          ...data,
+          hash: newHash,
+          lastSyncAt: admin.firestore.FieldValue.serverTimestamp(),
+          source: { type: "sheets", sheet: tabName, row: rowIndex },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      ops++;
+    } else {
+      const prevHash = prev.data()?.hash || null;
+
+      if (prevHash === newHash) {
+        skipped++;
+        continue;
+      }
+
+      updated++;
+
+      batch.set(
+        ref,
+        {
+          ...data,
+          hash: newHash,
+          lastSyncAt: admin.firestore.FieldValue.serverTimestamp(),
+          source: { type: "sheets", sheet: tabName, row: rowIndex },
+        },
+        { merge: true }
+      );
+
+      ops++;
     }
 
-    if ((prev.data().hash || null) === newHash) {
-      skipped++;
-      continue;
-    }
-
-    updated++;
-
-    batch.set(ref, {
-      ...data,
-      hash: newHash,
-      lastSyncAt: admin.firestore.FieldValue.serverTimestamp(),
-      source: { type: "sheets", sheet: tabName, row: rowIndex },
-    }, { merge: true });
-
-    ops++;
     if (ops >= 400) {
       await batch.commit();
       batch = db.batch();
@@ -83,9 +116,18 @@ async function syncTabToCollection({
     }
   }
 
-  if (ops > 0) await batch.commit();
-  return { created, updated, skipped, totalRows: rows.length };
+  if (ops > 0) {
+    await batch.commit();
+  }
+
+  return {
+    created,
+    updated,
+    skipped,
+    totalRows: rows.length,
+  };
 }
+
 
 exports.syncSheets = onCall({ region: "us-central1" },async (request) => {
   try {
@@ -144,24 +186,42 @@ const productosRes = await syncTabToCollection({
   tabName: "PRODUCTOS",
   collectionName: "productos",
   buildDoc: (obj, rowIndex) => {
-  const idProducto = String(obj["id_producto"] || "").trim();
-  if (!idProducto) {
-    throw new Error(`Fila sin id_producto (row ${rowIndex}) en PRODUCTOS`);
-  }
+    const idProducto = (obj["id_producto"] || "").trim();
+    
+    if (!idProducto) {
+      throw new Error(`Fila sin id_producto (row ${rowIndex}) en PRODUCTOS`);
+    }
 
-  const docId = idProducto;           // ID estable
-  const sourceKey = `id_producto:${idProducto}`;
-
+  const docId = idProducto;
+  const idInv = (obj["id_investigador"] || "").toString().trim();
+    
+   {/* const idProd = (obj["id_producto"] || obj["id"] || "").toString().trim();
+    const titulo = (obj["titulo"] || obj["nombre"] || "").toString().trim();
+    const tipo = (obj["tipo_producto"] || obj["tipo"] || "").toString().trim();
+    const key = idProd || `row:${rowIndex}|${norm(titulo)}|${norm(tipo)}`;
+   */}
   const data = {
-    id_producto: idProducto,                          // ✅ GUARDA EL ID
-    titulo: obj["titulo"] || "",
-    tipo_producto: obj["tipo_producto"] || obj["tipo"] || "",
+    id_producto: idProducto,
+    titulo: (obj["titulo"] || "").toString().trim(),
+    tipo_producto: (obj["tipo_producto"] || obj["tipo"] || "").toString().trim(),
     anio: Number(obj["anio"] || 0),
-    doi: obj["doi"] || null,
-    isbn: obj["isbn"] || null,
-    categoria_minciencias_producto: obj["categoria_minciencias_producto"] || obj["categoria_minciencias"] || "N/A",
-    sourceKey,
+    categoria_minciencias_producto:
+      (obj["categoria_minciencias_producto"] ||
+        obj["categoria_minciencias"] ||
+        "N/A").toString().trim(),
+       
+    doi: (obj["doi"] || "").toString().trim() || null,
+    isbn: (obj["isbn"] || "").toString().trim() || null,
+    id_investigador: idInv ? idInv.toUpperCase() : null,
+    id_investigador_norm: idInv ? idInv.toLowerCase() : null,
+    estado_producto: (obj["estado_producto"] || "").toString().trim(),
+    proyecto_asociado_id:
+      (obj["proyecto_asociado_id"] || obj["id_proyecto"] || "").toString().trim() || null,
+
+    synced_at: admin.firestore.FieldValue.serverTimestamp(),
+    
   };
+  
   return { docId, data };
 },
 });

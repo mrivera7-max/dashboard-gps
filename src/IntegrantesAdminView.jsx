@@ -220,11 +220,12 @@ useEffect(() => {
   if (!selectedId) return;
 
   let alive = true;
-  const invId = String(selectedId).trim();
+  const invIdNorm = String(selectedId).trim().toLowerCase(); // normalizado
+  
 
   const q = query(
     collection(db, "productos"),
-    where("id_investigador", "==", invId)
+    where("id_investigador_norm", "==", invIdNorm)
     // si necesitas orden: agrega orderBy("anio","desc") y crea índice
   );
 
@@ -534,7 +535,7 @@ useEffect(() => {
                 <div style={{ color: "#666" }}>Sin datos para el filtro seleccionado.</div>
               ) : (
                 <div style={{ width: "100%", height: 260 }}>
-                  <ResponsiveContainer>
+                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={analitica.serieYear}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="year" angle={-30} textAnchor="end" interval={0} />
