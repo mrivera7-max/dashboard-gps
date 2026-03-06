@@ -39,11 +39,11 @@ const CAT_COLORS = {
 };
 
 const INV_COLORS = {
-  IE: "#6B2D5C", // ciruela
-  IS: "#4A1D41", // morado
-  IA: "#C4A1C2", // malva
-  IJ: "#8B5A8C", // purpura
-  SC: "#E6D5E6", // lila
+  IE: "#0072B2", // azul
+  IS: "#009E73", // verde
+  IA: "#E69F00", // naranja
+  IJ: "#D55E00", // rojo
+  SC: "#999999", // gris
 };
 
 const LINEA_COLORS = {
@@ -130,19 +130,39 @@ async function loadEstadoGeneral() {
   });
 
       // ===== 1B) Evolución de vinculación (activos) =====
-    const invVincByYear = {};
+    const currentYear = new Date().getFullYear();
+    const startYear = currentYear - 9;
+
+    // investigadores presentes por año
+    const invPresentesByYear = {};
+
+    for (let y = startYear; y <= currentYear; y++) {
+      invPresentesByYear[y] = 0;
+    }
+
     invSnap.forEach((d) => {
       const i = d.data();
-      const y = Number(i.anio_vinculacion || 0); // ya lo tienes definido arriba
-      if (y > 0) invVincByYear[y] = (invVincByYear[y] || 0) + 1;
+
+      const inicio = Number(i.anio_vinculacion || 0);
+      if (!inicio) return;
+
+      const finRaw = Number(i.fin_vinculacion || 0);
+      const fin = finRaw > 0 ? finRaw : currentYear;
+
+      for (let y = Math.max(inicio, startYear); y <= Math.min(fin, currentYear); y++) {
+        invPresentesByYear[y] = (invPresentesByYear[y] || 0) + 1;
+      }
     });
 
-  const vinculacionPorAno = Object.keys(invVincByYear)
-    .map(Number)
-    .sort((a, b) => a - b)
-    .map((y) => ({ year: String(y), total: invVincByYear[y] }));
+    const vinculacionPorAno = Object.keys(invPresentesByYear)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map((y) => ({
+        year: String(y),
+        total: invPresentesByYear[y],
+      }));
 
-  const vincuUltimos10 = vinculacionPorAno.slice(-10);
+    const vincuUltimos10 = vinculacionPorAno;
 
   // ===== 2) PRODUCTOS =====
   
@@ -264,18 +284,17 @@ async function loadEstadoGeneral() {
  
 // acumulado de investigadores activos
 
- const currentYear = new Date().getFullYear();
-  const startYear = currentYear - 9;
+ 
 
   // ✅ usa invVincByYear (activos por año de vinculación) ya calculado arriba
   
-const produccionVsTalento = Array.from({ length: 10 }, (_, idx) => {
+  const produccionVsTalento = Array.from({ length: 10 }, (_, idx) => {
   const y = startYear + idx;
   
   return {
     year: String(y),
     productos: prodByYear[y] || 0,
-    investigadores: invVincByYear[y] || 0,
+    investigadores: invPresentesByYear[y] || 0,
   };
 });
 
@@ -302,11 +321,12 @@ const produccionVsTalento = Array.from({ length: 10 }, (_, idx) => {
       return row;
     });
 
-  const investigadoresActivosPorCategoria = CATS_INV.map((cat) => ({
-    categoria: cat,
-    total: invByCatActivos[cat] ?? 0,
-
-  }));
+  const investigadoresActivosPorCategoria = CATS_INV
+    .map((cat) => ({
+      categoria: cat,
+      total: invByCatActivos[cat] ?? 0,
+    }))
+    .filter((c) => c.total > 0);
 
   const PESOS_MADUREZ = { IE: 5, IS: 4, IA: 3, IJ: 2, SC: 1 };
 
@@ -707,6 +727,7 @@ export default function EstadoGeneralGrupo({ refreshKey }) {
                 nameKey="categoria"
                 cx="50%"
                 cy="50%"
+                innerRadius={60}
                 outerRadius={110}
                 label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
               >
@@ -714,6 +735,15 @@ export default function EstadoGeneralGrupo({ refreshKey }) {
                   <Cell key={e.categoria} fill={INV_COLORS[e.categoria] || "#1B75BC"} />
                 ))}
               </Pie>
+              <text
+                x="50%"
+                y="50%"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                style={{ fontSize: 22, fontWeight: 900, fill: "#1B75BC" }}
+              >
+                {kpis.investigadores.activos}
+              </text>
               <Tooltip />
               <Legend />
             </PieChart>
@@ -745,7 +775,7 @@ export default function EstadoGeneralGrupo({ refreshKey }) {
               yAxisId="right"
               type="monotone"
               dataKey="investigadores"
-              name="Investigadores activos"
+              name="Investigadores presentes"
               stroke="#EB5757"
               strokeWidth={3}
               dot={{ r: 4 }}
