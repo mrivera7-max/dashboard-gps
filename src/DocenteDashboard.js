@@ -16,7 +16,8 @@ import {
   updateDoc,
   where,
   getDocs,
-  limit
+  limit,
+  runTransaction,
 } from "firebase/firestore";
 
 
@@ -80,11 +81,10 @@ export default function DocenteDashboard({ logout }) {
               identificacion: inv.identificacion || "",
               genero: inv.genero || "",
               categoria_minciencias: inv.categoria_minciencias_investigador || "",
+              id_investigador: inv.id_investigador || "",
               estado: esActivo ? "activo" : "pendiente",
-
-              // de paso guardas el email institucional
               correo: emailLower,
-
+              
               updatedAt: serverTimestamp(),
             },
             { merge: true }
@@ -124,6 +124,7 @@ export default function DocenteDashboard({ logout }) {
       nombres: inv.nombres || "",
       apellidos: inv.apellidos || "",
       identificacion: inv.identificacion || "",
+      id_investigador: inv.id_investigador || "",
       categoria_minciencias: categoriaMincienciasMap[inv.categoria_minciencias_investigador] || "",
       estado: (inv.estado_investigador || "").toLowerCase() || "pendiente",
       updatedAt: serverTimestamp(),
@@ -275,7 +276,7 @@ export default function DocenteDashboard({ logout }) {
           {activeView === "perfil" ? (
             <PerfilDocente perfil={perfil} emailFallback={email} />
           ) : activeView === "produccion" ? (
-            <ProduccionDocente uid={uid} />
+            <ProduccionDocente uid={uid} perfil={perfil} />
           ) : (
             <ConexionesDocente perfil={perfil} />
           )}
@@ -494,13 +495,16 @@ function RedesSoloLinks({ conexiones }) {
   );
 }
 
-function ProduccionDocente({ uid }) {
+function ProduccionDocente({ uid, perfil }) {
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
-
-  // KPIs locales
   const [totalProyectos, setTotalProyectos] = useState(0);
+  const [categoria, setCategoria] = useState("Nuevo Conocimiento");
+  const [proyectoAsociado, setProyectoAsociado] = useState("");
+  const [doi, setDoi] = useState("");
+  const [isbn, setIsbn] = useState("");
+  const [misProyectos, setMisProyectos] = useState([]);
 
   // Form
   const [titulo, setTitulo] = useState("");
@@ -509,65 +513,267 @@ function ProduccionDocente({ uid }) {
   const [estado, setEstado] = useState("Borrador");
   const [url, setUrl] = useState("");
 
+  const idInvestigador = (perfil?.id_investigador || "").toString().trim();
+  const idInvestigadorNorm = idInvestigador.toLowerCase();
+
+  const [nombreProyecto, setNombreProyecto] = useState("");
+  const [anioInicioProyecto, setAnioInicioProyecto] = useState(new Date().getFullYear());
+  const [estadoProyecto, setEstadoProyecto] = useState("En ejecución");
+  const [lineaInvestigacion, setLineaInvestigacion] = useState("");
+  const [descripcionProyecto, setDescripcionProyecto] = useState("");
+
+  const LINEAS_GRUPO = [
+    "Robótica",
+    "Control",
+    "Procesamiento de Señales",
+    "Telecomunicaciones",
+  ];
+
+  const [form, setForm] = useState({
+    titulo: "",
+    tipo_producto: "",
+    anio: "",
+    estado_producto: "Borrador",
+    url: "",
+    proyecto_asociado_id: "",
+  });
+
   // ====== Productos del docente ======
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !idInvestigadorNorm) { 
+      setRows([]);
+      return;
+    }
 
     setErr("");
-    const ref = collection(db, "productos");
-    const qy = query(ref, where("ownerUid", "==", uid), orderBy("anio", "desc"));
+
+    const qy = query(
+      collection(db, "productos"),
+      where("id_investigador_norm", "==", idInvestigadorNorm)
+    );
 
     const unsub = onSnapshot(
       qy,
       (snap) => {
-        const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const data = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => Number(b.anio || 0) - Number(a.anio || 0));
         setRows(data);
       },
       (e) => {
-        console.error(e);
+        console.error("[productos]", e);
         setErr(e?.message || "Error leyendo productos");
       }
     );
 
     return () => unsub();
-  }, [uid]);
+  }, [idInvestigadorNorm]);
 
   // ====== Proyectos del docente ======
   useEffect(() => {
-    if (!uid) return;
-
-    setErr("");
-
-    // ✅ Opción A: proyectos con miembrosUids: [uid,...]
-    const ref = collection(db, "proyectos");
-    const qA = query(ref, where("miembrosUids", "array-contains", uid));
+    if (!idInvestigador) {
+      setMisProyectos([]);
+      return;
+    }
 
     const unsub = onSnapshot(
-      qA,
-      (snap) => setTotalProyectos(snap.size),
-      async (e) => {
-        // Si falla (porque no existe el campo o índice), intenta opción B:
-        console.warn("Query proyectos opción A falló, intentando opción B:", e?.message);
-
+      query(
+        collection(db, "proyectos"),
+        where("investigador_principal", "==", idInvestigador)
+      ),
+      async (proySnap) => {
         try {
-          const qB = query(ref, where("ownerUid", "==", uid));
-          return onSnapshot(
-            qB,
-            (snap) => setTotalProyectos(snap.size),
-            (e2) => {
-              console.error(e2);
-              setErr(e2?.message || "Error leyendo proyectos");
-            }
+
+          const proyectos = proySnap.docs.map((d) => ({
+            id: d.id,
+            ...d.data()
+          }));
+
+          const prodSnap = await getDocs(
+            query(
+              collection(db, "productos"),
+              where("id_investigador_norm", "==", idInvestigadorNorm)
+            )
           );
-        } catch (e2) {
-          console.error(e2);
-          setErr(e2?.message || "Error leyendo proyectos");
+
+          const productos = prodSnap.docs.map((d) => ({
+            id: d.id,
+            ...d.data()
+          }));
+
+          const proyectosConConteo = proyectos.map((p) => {
+            const productosProyecto = productos.filter(
+              (prod) => (prod.proyecto_asociado_id || "") === p.id
+            );
+
+            const totalProductos = productosProyecto.length;
+
+            const totalNC = productosProyecto.filter(
+              (prod) => (prod.categoria_minciencias_producto || "") === "Nuevo Conocimiento"
+            ).length;
+
+            const totalDT = productosProyecto.filter(
+              (prod) => (prod.categoria_minciencias_producto || "") === "Desarrollo Tecnológico"
+            ).length;
+
+            const totalASC = productosProyecto.filter(
+              (prod) => (prod.categoria_minciencias_producto || "") === "Apropiación Social"
+            ).length;
+
+            return {
+              ...p,
+              total_productos_asociados: totalProductos,
+              total_nc: totalNC,
+              total_dt: totalDT,
+              total_asc: totalASC,
+            };
+          });
+
+          proyectosConConteo.sort(
+            (a, b) => Number(b.anio_inicio || 0) - Number(a.anio_inicio || 0)
+          );
+
+          setMisProyectos(proyectosConConteo);
+
+        } catch (err) {
+          console.error("Error cargando proyectos:", err);
         }
       }
     );
 
     return () => unsub();
-  }, [uid]);
+
+  }, [idInvestigador, idInvestigadorNorm]);
+
+  useEffect(() => {
+  if (!idInvestigador) {
+    setMisProyectos([]);
+    return;
+  }
+
+  const qy = query(
+    collection(db, "proyectos"),
+    where("investigador_principal", "==", idInvestigador)
+  );
+
+  const unsub = onSnapshot(
+    qy,
+    (snap) => {
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setMisProyectos(data);
+    },
+    (e) => {
+      console.error("[misProyectos]", e);
+      setErr(e?.message || "Error leyendo proyectos del docente");
+    }
+  );
+
+  return () => unsub();
+}, [idInvestigador]);
+
+  const generarCodigoProyecto = async () => {
+    const cfgRef = doc(db, "config", "grupoGPS");
+
+    const nextNumber = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(cfgRef);
+
+      const actual = snap.exists() ? Number(snap.data()?.contador_proyectos || 0) : 0;
+      const siguiente = actual + 1;
+
+      tx.set(
+        cfgRef,
+        {
+          contador_proyectos: siguiente,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return siguiente;
+    });
+
+    return `PROY-${String(nextNumber).padStart(3, "0")}`;
+  };
+
+  const crearProyecto = async () => {
+    try {
+      setErr("");
+      setMsg("");
+
+      if (!idInvestigador) {
+        setErr("No se encontró id_investigador.");
+        return;
+      }
+
+      if (!nombreProyecto.trim()) {
+        setErr("El nombre del proyecto es obligatorio.");
+        return;
+      }
+
+      const y = Number(anioInicioProyecto);
+      const thisYear = new Date().getFullYear();
+
+      if (!Number.isFinite(y) || y < 2000 || y > thisYear + 1) {
+        return setErr(`Año inválido. Usa un valor entre 2000 y ${thisYear + 1}.`);
+      }
+
+      const codigoGenerado = await generarCodigoProyecto();
+
+      await setDoc(doc(db, "proyectos", codigoGenerado), {
+        id_proyecto: codigoGenerado,
+        codigo: codigoGenerado,
+        grupo: "GPS",
+
+        nombre_proyecto: nombreProyecto.trim(),
+        anio_inicio: y,
+        estado_proyecto: estadoProyecto,
+        linea_investigacion: lineaInvestigacion,
+        descripcion_tema: descripcionProyecto.trim() || null,
+
+        investigador_principal: idInvestigador,
+        investigador_principal_norm: idInvestigadorNorm,
+
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      setNombreProyecto("");
+      setAnioInicioProyecto(new Date().getFullYear());
+      setEstadoProyecto("En ejecución");
+      setLineaInvestigacion("Robótica");
+      setDescripcionProyecto("");
+
+      setMsg(`Proyecto registrado ✅ Código asignado: ${codigoGenerado}`);
+
+    } catch (e) {
+      console.error(e);
+      setErr("Error registrando proyecto");
+    }
+  };
+
+
+  const generarCodigoProducto = async () => {
+    const cfgRef = doc(db, "config", "grupoGPS");
+
+    const nextNumber = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(cfgRef);
+      const actual = snap.exists() ? Number(snap.data()?.contador_productos || 0) : 0;
+      const siguiente = actual + 1;
+
+      tx.set(
+        cfgRef,
+        {
+          contador_productos: siguiente,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return siguiente;
+    });
+
+    return `PROD-${String(nextNumber).padStart(3, "0")}`;
+  };
 
   const crearProducto = async () => {
     try {
@@ -575,31 +781,55 @@ function ProduccionDocente({ uid }) {
       setErr("");
 
       if (!uid) return setErr("No hay sesión.");
+      if (!idInvestigador) return setErr("No se encontró id_investigador para este docente.");
 
+      const y = Number(anio);
+      const thisYear = new Date().getFullYear();
+      
       if (!titulo.trim() || titulo.trim().length < 8) {
         return setErr("El título es obligatorio (mínimo 8 caracteres).");
       }
 
-      const y = Number(anio);
-      const thisYear = new Date().getFullYear();
+      if (!categoria) {
+        return setErr("Debes seleccionar una categoría MinCiencias.");
+      }
+
+      if (doi.trim() && isbn.trim()) {
+        return setErr("Usa DOI o ISBN según corresponda, no ambos a la vez.");
+      }
+
       if (!Number.isFinite(y) || y < 2000 || y > thisYear + 1) {
         return setErr(`Año inválido. Usa un valor entre 2000 y ${thisYear + 1}.`);
       }
 
       await addDoc(collection(db, "productos"), {
         grupo: "GPS",
-        ownerUid: uid,
+        ownerUid: uid, 
+        id_investigador: idInvestigador,
+        id_investigador_norm: idInvestigadorNorm,
         titulo: titulo.trim(),
-        tipo,
+        tipo_producto: tipo,
         anio: y,
-        estado,
+        estado_producto: estado,
+        categoria_minciencias_producto: categoria,
+        proyecto_asociado_id: proyectoAsociado || null,
+
+        doi: doi.trim() || null,
+        isbn: isbn.trim() || null,
         url: url.trim() || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
       setTitulo("");
+      setTipo("Artículo");
+      setAnio(new Date().getFullYear());
+      setEstado("Borrador");
       setUrl("");
+      setCategoria("Nuevo Conocimiento");
+      setProyectoAsociado("");
+      setDoi("");
+      setIsbn("");
       setMsg("Producto registrado ✅");
     } catch (e) {
       console.error(e);
@@ -610,7 +840,7 @@ function ProduccionDocente({ uid }) {
   const actualizarEstado = async (id, newEstado) => {
     try {
       await updateDoc(doc(db, "productos", id), {
-        estado: newEstado,
+        estado_producto: newEstado,
         updatedAt: serverTimestamp(),
       });
     } catch (e) {
@@ -619,20 +849,232 @@ function ProduccionDocente({ uid }) {
     }
   };
 
-  return (
-    <div style={{ display: "grid", gap: 12 }}>
-      {/* ✅ KPI BAR */}
-      <div style={styles.kpiGrid}>
-        <div style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>Total productos registrados</div>
-          <div style={styles.kpiValue}>{rows.length}</div>
-        </div>
+  const kpisPersonales = useMemo(() => {
+    const totalProductos = rows.length;
+    const totalProyectosLocal = misProyectos.length;
 
-        <div style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>Total proyectos registrados</div>
-          <div style={styles.kpiValue}>{totalProyectos}</div>
+    const porCategoria = {
+      NC: 0,
+      DT: 0,
+      ASC: 0,
+      DIV: 0,
+      FRH: 0,
+    };
+
+    const porAnio = {};
+
+    rows.forEach((p) => {
+      const cat = (p.categoria_minciencias_producto || "").toString().trim();
+      const anioProd = Number(p.anio || 0);
+
+      if (cat === "Nuevo Conocimiento") porCategoria.NC++;
+      else if (cat === "Desarrollo Tecnológico") porCategoria.DT++;
+      else if (cat === "Apropiación Social") porCategoria.ASC++;
+      else if (cat === "Divulgación pública ciencia") porCategoria.DIV++;
+      else if (cat === "Formación RRHH") porCategoria.FRH++;
+
+      if (anioProd > 0) {
+        porAnio[anioProd] = (porAnio[anioProd] || 0) + 1;
+      }
+    });
+
+    const anios = Object.keys(porAnio).map(Number).sort((a, b) => a - b);
+    const totalAnios = anios.length;
+
+    const promedioPorAnio =
+      totalAnios > 0 ? Number((totalProductos / totalAnios).toFixed(2)) : 0;
+
+    let anioMasProductivo = "—";
+    let maxProd = 0;
+    Object.entries(porAnio).forEach(([anio, total]) => {
+      if (total > maxProd) {
+        maxProd = total;
+        anioMasProductivo = anio;
+      }
+    });
+
+    const serieProduccion = anios.map((anio) => ({
+      year: String(anio),
+      total: porAnio[anio],
+    }));
+
+    return {
+      totalProductos,
+      totalProyectos: totalProyectosLocal,
+      porCategoria,
+      promedioPorAnio,
+      anioMasProductivo,
+      serieProduccion,
+    };
+  }, [rows, misProyectos]);
+
+  const categorias = kpisPersonales.porCategoria;
+  const codigoPerfil = Object.entries(categorias)
+   .sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
+
+  const coloresPerfil = {
+    NC: "#0B3C5D",   // azul oceano
+    DT: "#1F77B4",   // azul marino
+    ASC: "#2C7FB8",  // azul medio
+    DIV: "#1FA187",  // verde mar
+    FRH: "#17BECF",  // turquesa
+  };
+
+  const nombresCategorias = {
+    NC: "Nuevo Conocimiento",
+    DT: "Desarrollo Tecnológico",
+    ASC: "Apropiación Social del Conocimiento",
+    DIV: "Divulgación Científica",
+    FRH: "Formación de Recurso Humano"
+  };
+
+  const perfilPredominante = nombresCategorias[codigoPerfil] || codigoPerfil;
+
+  if (!idInvestigador) {
+    return (
+      <Card title="Producción">
+        <div style={{ color: "#92400e", fontWeight: 800 }}>
+          Tu perfil aún no tiene asociado un id_investigador. Verifica la sincronización con la colección investigadores.
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+  <>
+    <div style={styles.kpiGrid}>
+      <div style={styles.kpiCard}>
+        <div style={styles.kpiLabel}>Total productos registrados</div>
+        <div style={styles.kpiValue}>{kpisPersonales.totalProductos}</div>
+      </div>
+
+      <div style={styles.kpiCard}>
+        <div style={styles.kpiLabel}>Total proyectos registrados</div>
+        <div style={styles.kpiValue}>{kpisPersonales.totalProyectos}</div>
+      </div>
+
+      <div style={styles.kpiCard}>
+        <div style={styles.kpiLabel}>Promedio productos por año</div>
+        <div style={styles.kpiValue}>{kpisPersonales.promedioPorAnio}</div>
+      </div>
+
+      <div style={styles.kpiCard}>
+        <div style={styles.kpiLabel}>Año más productivo</div>
+        <div style={styles.kpiValue}>{kpisPersonales.anioMasProductivo}</div>
+      </div>
+
+      <div style={styles.kpiCard}>
+        <div style={styles.kpiLabel}>Perfil predominante</div>
+
+        <div
+          style={{
+            ...styles.kpiValue,
+            fontSize: 18,
+            color: coloresPerfil[codigoPerfil] || "#2D3748"
+          }}
+        >
+          {perfilPredominante}
         </div>
       </div>
+
+    </div>
+
+    <div style={styles.kpiGridExtended}>
+      <div style={styles.kpiCard}>
+        <div style={styles.kpiLabel}>NC</div>
+        <div style={styles.kpiValue}>{kpisPersonales.porCategoria.NC}</div>
+      </div>
+
+      <div style={styles.kpiCard}>
+        <div style={styles.kpiLabel}>DT</div>
+        <div style={styles.kpiValue}>{kpisPersonales.porCategoria.DT}</div>
+      </div>
+
+      <div style={styles.kpiCard}>
+        <div style={styles.kpiLabel}>ASC</div>
+        <div style={styles.kpiValue}>{kpisPersonales.porCategoria.ASC}</div>
+      </div>
+
+      <div style={styles.kpiCard}>
+        <div style={styles.kpiLabel}>DIV</div>
+        <div style={styles.kpiValue}>{kpisPersonales.porCategoria.DIV}</div>
+      </div>
+
+      <div style={styles.kpiCard}>
+        <div style={styles.kpiLabel}>FRH</div>
+        <div style={styles.kpiValue}>{kpisPersonales.porCategoria.FRH}</div>
+      </div>
+    </div>
+
+      <Card title="Registrar nuevo proyecto">
+
+        {err ? <div style={styles.inlineError}>{err}</div> : null}
+        {msg ? <div style={styles.inlineOk}>{msg}</div> : null}
+
+        <div style={styles.formGrid}>
+          <div style={{ gridColumn: "1 / span 2" }}>
+            <div style={styles.label}>Nombre del proyecto</div>
+            <input
+              value={nombreProyecto}
+              onChange={(e)=>setNombreProyecto(e.target.value)}
+              style={styles.input}
+              placeholder="Ej: Sistema inteligente para ..."
+            />
+          </div>
+
+          <div>
+            <div style={styles.label}>Año inicio</div>
+            <input
+              type="number"
+              value={anioInicioProyecto}
+              onChange={(e)=>setAnioInicioProyecto(e.target.value)}
+              style={styles.input}
+            />
+          </div>
+
+            <div>
+              <div style={styles.label}>Estado</div>
+              <select
+                value={estadoProyecto}
+                onChange={(e)=>setEstadoProyecto(e.target.value)}
+                style={styles.input}
+              >
+                <option>En ejecución</option>
+                <option>Finalizado</option>
+                <option>Formulación</option>
+              </select>
+            </div>
+
+            <div>
+              <div style={styles.label}>Línea de investigación</div>
+              <select
+                value={lineaInvestigacion}
+                onChange={(e) => setLineaInvestigacion(e.target.value)}
+                style={styles.input}
+              >
+                {LINEAS_GRUPO.map((l) => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div style={styles.label}>Descripción / tema</div>
+              <textarea
+                value={descripcionProyecto}
+                onChange={(e) => setDescripcionProyecto(e.target.value)}
+                style={styles.textarea}
+                placeholder="Describe brevemente el tema, propósito o enfoque del proyecto"
+              />
+            </div>
+          </div>
+
+          <div style={{marginTop:12}}>
+            <button onClick={crearProyecto} style={styles.primaryBtn}>
+              Guardar proyecto
+            </button>
+          </div>
+      </Card>
 
       <Card title="Registrar nuevo producto">
         {err ? <div style={styles.inlineError}>{err}</div> : null}
@@ -655,9 +1097,10 @@ function ProduccionDocente({ uid }) {
               <option>Artículo</option>
               <option>Ponencia</option>
               <option>Capítulo de libro</option>
-              <option>Libro</option>
+              <option>Libro Investigación</option>
               <option>Software</option>
               <option>Proyecto</option>
+              <option>Prototipo</option>
               <option>Otro</option>
             </select>
           </div>
@@ -678,8 +1121,60 @@ function ProduccionDocente({ uid }) {
               <option>Borrador</option>
               <option>Enviado</option>
               <option>Aceptado</option>
+              <option>Registrado</option>
               <option>Publicado</option>
             </select>
+          </div>
+
+          <div>
+            <div style={styles.label}>Categoría MinCiencias</div>
+            <select value={categoria} onChange={(e) => setCategoria(e.target.value)} style={styles.input}>
+              <option>Nuevo Conocimiento</option>
+              <option>Desarrollo Tecnológico</option>
+              <option>Apropiación Social</option>
+              <option>Divulgación pública ciencia</option>
+              <option>Formación RRHH</option>
+            </select>
+          </div>
+
+          <div>
+            <div style={styles.label}>Proyecto asociado</div>
+            <select
+              value={form.proyecto_asociado_id}
+              onChange={(e) =>
+                setForm({ ...form, proyecto_asociado_id: e.target.value })
+              }
+              style={styles.input}
+            >
+              <option value="">Seleccionar proyecto</option>
+
+              {misProyectos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {(p.codigo || p.id_proyecto || p.id)} - {p.nombre_proyecto}
+                </option>
+              ))}
+
+            </select>
+          </div>
+
+          <div>
+            <div style={styles.label}>DOI</div>
+            <input
+              value={doi}
+              onChange={(e) => setDoi(e.target.value)}
+              style={styles.input}
+              placeholder="10.xxxx/xxxxx"
+            />
+          </div>
+
+          <div>
+            <div style={styles.label}>ISBN</div>
+            <input
+              value={isbn}
+              onChange={(e) => setIsbn(e.target.value)}
+              style={styles.input}
+              placeholder="978-..."
+            />
           </div>
 
           <div style={{ gridColumn: "1 / -1" }}>
@@ -700,10 +1195,15 @@ function ProduccionDocente({ uid }) {
         </div>
       </Card>
 
+      <Card title="Mis proyectos">
+        <ProyectosTable rows={misProyectos} />
+      </Card>
+
       <Card title="Mis productos">
         <ProductosTable rows={rows} onChangeEstado={actualizarEstado} />
       </Card>
-    </div>
+    
+  </>
   );
 }
 
@@ -918,6 +1418,57 @@ function ConRow({ label, value, onToggle, onUrl }) {
   );
 }
 
+function ProyectosTable({ rows }) {
+
+    if (!rows || rows.length === 0) {
+      return (
+        <div style={{ color: "#4A5568", fontWeight: 700 }}>
+          Sin proyectos registrados todavía.
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ overflowX: "auto" }}>
+        <table style={tableStyle}>
+
+          <thead>
+            <tr>
+              <th style={th}>Código</th>
+              <th style={th}>Proyecto</th>
+              <th style={th}>Año</th>
+              <th style={th}>Estado</th>
+              <th style={th}>Línea</th>
+              <th style={th}>Productos</th>
+              <th style={th}>Impacto</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map((p) => (
+              <tr key={p.id}>
+                <td style={td}>{p.codigo || p.id_proyecto || p.id}</td>
+                <td style={td}>{p.nombre_proyecto || "—"}</td>
+                <td style={td}>{p.anio_inicio || "—"}</td>
+                <td style={td}>{p.estado_proyecto || "—"}</td>
+                <td style={td}>{p.linea_investigacion || "—"}</td>
+                <td style={{ ...td, fontWeight: 900 }}>{p.total_productos_asociados ?? 0}</td>
+                <td style={td}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <span style={styles.impactBadgeNC}>NC: {p.total_nc ?? 0}</span>
+                    <span style={styles.impactBadgeDT}>DT: {p.total_dt ?? 0}</span>
+                    <span style={styles.impactBadgeASC}>ASC: {p.total_asc ?? 0}</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+
+        </table>
+      </div>
+    );
+  }
+
 function ProductosTable({ rows, onChangeEstado }) {
   if (!rows || rows.length === 0) {
     return <div style={{ color: "#4A5568", fontWeight: 700 }}>Sin registros todavía.</div>;
@@ -931,7 +1482,9 @@ function ProductosTable({ rows, onChangeEstado }) {
             <th style={th}>Año</th>
             <th style={th}>Tipo</th>
             <th style={th}>Título</th>
+            <th style={th}>Categoría</th>
             <th style={th}>Estado</th>
+             <th style={th}>DOI / ISBN</th>
             <th style={th}>URL</th>
           </tr>
         </thead>
@@ -939,20 +1492,23 @@ function ProductosTable({ rows, onChangeEstado }) {
           {rows.map((p) => (
             <tr key={p.id}>
               <td style={td}>{p.anio ?? "—"}</td>
-              <td style={td}>{p.tipo ?? "—"}</td>
+              <td style={td}>{p.tipo_producto || p.tipo || "—"}</td>
               <td style={td}>{p.titulo ?? "—"}</td>
+              <td style={td}>{p.categoria_minciencias_producto || "—"}</td>
               <td style={td}>
                 <select
-                  value={p.estado || "Borrador"}
+                  value={p.estado_producto || p.estado || "Borrador"}
                   onChange={(e) => onChangeEstado(p.id, e.target.value)}
                   style={{ ...styles.input, padding: "8px 10px" }}
                 >
                   <option>Borrador</option>
                   <option>Enviado</option>
                   <option>Aceptado</option>
+                  <option>Registrado</option>
                   <option>Publicado</option>
                 </select>
               </td>
+              <td style={td}>{p.doi || p.isbn || "—"}</td>
               <td style={td}>
                 {p.url ? (
                   <a href={p.url} target="_blank" rel="noreferrer" style={styles.link}>
@@ -981,7 +1537,7 @@ function Card({ title, children }) {
 
 function Row({ label, value, isLink = false, multiline = false }) {
   const v = value ?? "—";
-  const looksLikeUrl = typeof v === "string" && (v.startsWith("http://") || v.startsWith("https://"));
+  const looksLikeUrl = typeof v === "string" && (v.startsWith("http://") || v.startsWith("https://"))
 
   return (
     <div style={styles.row}>
@@ -1012,10 +1568,16 @@ const styles = {
     borderRight: "1px solid rgba(0,0,0,0.15)",
     display: "flex",
     flexDirection: "column",
-    justifyContent: "space-between",
+    height: "100vh",
+    position: "sticky",
+    top: 0,
+    overflowY: "auto",
     color: "white",
   },
-  sideTop: { padding: 16 },
+  sideTop: {
+    padding: 16,
+    flex: 1,
+  },
   sideLogo: { height: 40, width: "auto" },
 
   sideProfile: { marginTop: 18, textAlign: "center" },
@@ -1052,7 +1614,11 @@ const styles = {
     color: "#1B75BC",
   },
 
-  sideBottom: { padding: 16, borderTop: "1px solid rgba(45,156,219,0.18)" },
+  sideBottom: {
+    padding: 16,
+    borderTop: "1px solid rgba(45,156,219,0.18)",
+    marginTop: "auto",
+  },
   logoutBtn: {
     width: "100%",
     padding: "12px 12px",
@@ -1130,7 +1696,12 @@ headerLogo: {
   rowLabel: { color: "#6B7280", fontWeight: 800 },
   rowValue: { color: "#111827", fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis" },
 
-  formGrid: { display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 10, marginTop: 10 },
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: 10,
+    marginTop: 10,
+  },
   label: { fontSize: 12.5, fontWeight: 900, color: "#374151", marginBottom: 6 },
   input: {
     width: "100%",
@@ -1236,8 +1807,9 @@ badgeWarn: {
 
 kpiGrid: {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 12,
+  gridTemplateColumns: "repeat(5, 1fr)",
+  gap: 16,
+  alignItems: "center",
 },
 kpiCard: {
   border: "1px solid rgba(45,156,219,0.25)",
@@ -1257,6 +1829,48 @@ systemInfo: {
   lineHeight: 1.4,
 },
 
+impactBadgeNC: {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "5px 8px",
+  borderRadius: 999,
+  fontWeight: 900,
+  fontSize: 12,
+  background: "rgba(11, 60, 93, 0.12)",
+  color: "#0B3C5D",
+  border: "1px solid rgba(11, 60, 93, 0.25)",
+},
+
+impactBadgeDT: {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "5px 8px",
+  borderRadius: 999,
+  fontWeight: 900,
+  fontSize: 12,
+  background: "rgba(31, 119, 180, 0.12)",
+  color: "#1F77B4",
+  border: "1px solid rgba(31, 119, 180, 0.25)",
+},
+
+impactBadgeASC: {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "5px 8px",
+  borderRadius: 999,
+  fontWeight: 900,
+  fontSize: 12,
+  background: "rgba(44, 127, 184, 0.12)",
+  color: "#2C7FB8",
+  border: "1px solid rgba(44, 127, 184, 0.25)",
+},
+
+kpiGridExtended: {
+  display: "grid",
+  gridTemplateColumns: "repeat(5, 1fr)",
+  gap: 12,
+  alignItems: "center",
+}
 
 };
 
