@@ -426,8 +426,6 @@ function PerfilDocente({ perfil, emailFallback }) {
               </span>
             </div>
           </div>
-
-          <Row label="CvLAC URL" value={perfil?.cvlac_url || redes?.cvlacUrl || "—"} isLink />
         </Card>
       </div>
 
@@ -1239,15 +1237,27 @@ function ConexionesDocente({ perfil }) {
     };
   }, [perfil]);
 
-  const [form, setForm] = useState(init);
+  const [form, setForm] = useState(null);
 
-  useEffect(() => setForm(init), [init]);
+  // solo inicializa una vez cuando llega perfil
+  useEffect(() => {
+    if (!perfil || form) return;
+    setForm(init);
+  }, [perfil, init, form]);
 
   const setA = (k, patch) =>
-    setForm((s) => ({ ...s, academicas: { ...s.academicas, [k]: { ...s.academicas[k], ...patch } } }));
+    setForm((s) => {
+      const next = { ...s.academicas[k], ...patch };
+      if (patch.enabled === false) next.url = "";
+      return { ...s, academicas: { ...s.academicas, [k]: next } };
+    });
 
   const setI = (k, patch) =>
-    setForm((s) => ({ ...s, identificadores: { ...s.identificadores, [k]: { ...s.identificadores[k], ...patch } } }));
+    setForm((s) => {
+      const next = { ...s.identificadores[k], ...patch };
+      if (patch.enabled === false) next.url = "";
+      return { ...s, identificadores: { ...s.identificadores, [k]: next } };
+    });
 
   const guardar = async () => {
     try {
@@ -1301,6 +1311,18 @@ function ConexionesDocente({ perfil }) {
       </Card>
     );
   } 
+
+  if (!form) {
+    return (
+      <Card title="Conexiones">
+        <div style={{ color: "#4A5568", fontWeight: 800 }}>
+          Cargando conexiones...
+        </div>
+      </Card>
+    );
+  }
+
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <Card title="Conexiones">
