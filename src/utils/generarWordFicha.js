@@ -3,7 +3,7 @@ import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
 
 export const generarWordFicha = async (form) => {
-  const response = await fetch("/plantillas/Formato_Ficha_2025_template_dashboard_anio_vigente.docx");
+  const response = await fetch("/plantillas/Formato_Ficha_template_dashboard_anio_vigente.docx");
   const content = await response.arrayBuffer();
 
   const zip = new PizZip(content);
@@ -47,10 +47,12 @@ export const generarWordFicha = async (form) => {
     linea_investigacion: form?.identificacion_proyecto?.linea_investigacion || "",
     area_tematica: form?.identificacion_proyecto?.area_tematica || "",
 
-    ods_1: ods[0] || "",
-    ods_2: ods[1] || "",
-    ods_3: ods[2] || "",
-    ods_4: ods[3] || "",
+    ods_lista: Array.isArray(form?.identificacion_proyecto?.ods)
+      ? form.identificacion_proyecto.ods.map((ods, i) => ({
+          indice: i + 1,
+          ods: ods,
+        }))
+      : [],
 
     problema: form?.formulacion?.problema || "",
     justificacion: form?.formulacion?.justificacion_viabilidad || "",
@@ -60,32 +62,14 @@ export const generarWordFicha = async (form) => {
     equipo_trabajo: Array.isArray(form?.equipo_trabajo) ? form.equipo_trabajo : [],
     productos: Array.isArray(form?.productos) ? form.productos : [],
 
-    impactos_lista: [
-      {
-        impacto: "En el desarrollo regional",
-        descripcion: form?.impactos?.desarrollo_regional || "",
-        beneficiarios: "",
-        indicadores: "",
-      },
-      {
-        impacto: "Económico",
-        descripcion: form?.impactos?.economico || "",
-        beneficiarios: "",
-        indicadores: "",
-      },
-      {
-        impacto: "Ambiental",
-        descripcion: form?.impactos?.ambiental || "",
-        beneficiarios: "",
-        indicadores: "",
-      },
-      {
-        impacto: "Para el fortalecimiento de la UDI",
-        descripcion: form?.impactos?.fortalecimiento_udi || "",
-        beneficiarios: "",
-        indicadores: "",
-      },
-    ],
+    impactos_lista: Array.isArray(form?.impactos)
+    ? form.impactos.map((item) => ({
+        impacto: item.tipo || "",
+        descripcion: item.descripcion || "",
+        beneficiarios: item.beneficiarios || "",
+        indicadores: item.indicadores || "",
+      }))
+    : [],
 
     apropiacion_social: Array.isArray(form?.apropiacion_social) ? form.apropiacion_social : [],
     presupuesto: Array.isArray(form?.presupuesto) ? form.presupuesto : [],

@@ -3,7 +3,7 @@ import gpsLogo from "./assets/logo-gps.png";
 import udiLogo from "./assets/logo-udi.png";
 import { auth, db } from "./firebaseConfig";
 import { generarWordFicha } from "./utils/generarWordFicha";
-import { generarPDF } from "./utils/generarPDF";
+
 
 
 import {
@@ -83,6 +83,32 @@ const AREAS_CONOCIMIENTO_MINCIENCIAS = [
     "Ciencias Sociales",
     "Humanidades",
   ];
+
+  const CATALOGO_PRODUCTOS_SUGERIDOS = {
+    GNC: [
+      "Artículo científico",
+      "Ponencia en evento científico",
+      "Capítulo de libro de investigación",
+    ],
+    DT: [
+      "Software registrado",
+      "Prototipo funcional",
+      "Modelo analítico validado",
+      "Base de datos estructurada",
+    ],
+    ASC: [
+      "Taller de apropiación social",
+      "Webinar de divulgación",
+      "Manual técnico o guía de uso",
+      "Socialización con comunidad o empresa",
+    ],
+    FRH: [
+      "Trabajo de grado de pregrado",
+      "Trabajo de grado de maestría",
+      "Formación de semillero",
+      "Dirección de joven investigador",
+    ],
+  };
 
 export default function DocenteDashboard({ logout }) {
   const role = useMemo(() => "docente", []);
@@ -1473,8 +1499,26 @@ function FichaDesafioDocente({ uid, perfil }) {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
-
   const [loaded, setLoaded] = useState(false);
+  
+  const esLider = (perfil?.rol || "").toLowerCase() === "lider";
+
+  const [productosSugeridos, setProductosSugeridos] = useState([]);
+
+  const productosObligatoriosLider = [
+    {
+      categoria: "Producto de Formación del Recurso Humano (FRH)",
+      subcategoria: "Informe final de las actividades desarrolladas en el grupo o semillero de investigación",
+      fecha_entrega: "",
+      obligatorio: true,
+    },
+    {
+      categoria: "Producto de Apropiación Social del Conocimiento (ASC)",
+      subcategoria: "Evidencia de actualización de CvLAC o GrupLAC",
+      fecha_entrega: "",
+      obligatorio: true,
+    },
+  ];
 
   const initialState = useMemo(() => ({
     datos_generales: {
@@ -1509,19 +1553,51 @@ function FichaDesafioDocente({ uid, perfil }) {
         cvlac: perfil?.conexiones?.identificadores?.cvlac?.url || "",
       },
     ],
-    productos: [
+    productos: esLider
+    ? [
+        ...productosObligatoriosLider,
+        {
+          categoria: "",
+          subcategoria: "",
+          fecha_entrega: "",
+          obligatorio: false,
+        },
+      ]
+    : [
+        {
+          categoria: "",
+          subcategoria: "",
+          fecha_entrega: "",
+          obligatorio: false,
+        },
+      ],
+
+    impactos: [
       {
-        categoria: "",
-        subcategoria: "",
-        fecha_entrega: "",
+        tipo: "En el desarrollo regional",
+        descripcion: "",
+        beneficiarios: "",
+        indicadores: "",
+      },
+      {
+        tipo: "Económico",
+        descripcion: "",
+        beneficiarios: "",
+        indicadores: "",
+      },
+      {
+        tipo: "Ambiental",
+        descripcion: "",
+        beneficiarios: "",
+        indicadores: "",
+      },
+      {
+        tipo: "Para el fortalecimiento de la UDI",
+        descripcion: "",
+        beneficiarios: "",
+        indicadores: "",
       },
     ],
-    impactos: {
-      desarrollo_regional: "",
-      economico: "",
-      ambiental: "",
-      fortalecimiento_udi: "",
-    },
     apropiacion_social: [
       {
         actividad: "",
@@ -1556,7 +1632,10 @@ function FichaDesafioDocente({ uid, perfil }) {
 
   }), [perfil]);
 
+  
   const [form, setForm] = useState(initialState);
+
+  const fechaFinProyecto = form?.datos_generales?.fecha_fin || "";
 
    useEffect(() => {
     if (!uid || loaded) return;
@@ -1567,7 +1646,95 @@ function FichaDesafioDocente({ uid, perfil }) {
         const snap = await getDoc(ref);
 
         if (snap.exists()) {
-          setForm(snap.data());
+          const data = snap.data();
+
+          setForm({
+            ...initialState,
+            ...data,
+
+            datos_generales: {
+              ...initialState.datos_generales,
+              ...(data.datos_generales || {}),
+            },
+
+            identificacion_proyecto: {
+              ...initialState.identificacion_proyecto,
+              ...(data.identificacion_proyecto || {}),
+              ods: Array.isArray(data.identificacion_proyecto?.ods)
+                ? data.identificacion_proyecto.ods
+                : initialState.identificacion_proyecto.ods,
+            },
+
+            formulacion: {
+              ...initialState.formulacion,
+              ...(data.formulacion || {}),
+            },
+
+            impactos:
+              Array.isArray(data.impactos) && data.impactos.length
+                ? data.impactos
+                : initialState.impactos,
+
+            firmas: {
+              ...initialState.firmas,
+              ...(data.firmas || {}),
+            },
+
+            equipo_trabajo:
+              Array.isArray(data.equipo_trabajo) && data.equipo_trabajo.length
+                ? data.equipo_trabajo
+                : initialState.equipo_trabajo,
+
+            productos: (() => {
+              const productosGuardados =
+                Array.isArray(data.productos) && data.productos.length
+                  ? data.productos
+                  : initialState.productos;
+
+              if (!esLider) return productosGuardados;
+
+              const yaTieneInforme = productosGuardados.some(
+                (p) =>
+                  (p.subcategoria || "").trim().toLowerCase() ===
+                  "informe final de las actividades desarrolladas en el grupo o semillero de investigación"
+                    .toLowerCase()
+              );
+
+              const yaTieneEvidencia = productosGuardados.some(
+                (p) =>
+                  (p.subcategoria || "").trim().toLowerCase() ===
+                  "evidencia de actualización de cvlac o gruplac"
+                    .replace(" ", "")
+              );
+
+              const obligatorios = [];
+
+              if (!yaTieneInforme) {
+                obligatorios.push(productosObligatoriosLider[0]);
+              }
+
+              if (!yaTieneEvidencia) {
+                obligatorios.push(productosObligatoriosLider[1]);
+              }
+
+              return [...obligatorios, ...productosGuardados];
+            })(),
+
+            apropiacion_social:
+              Array.isArray(data.apropiacion_social) && data.apropiacion_social.length
+                ? data.apropiacion_social
+                : initialState.apropiacion_social,
+
+            presupuesto:
+              Array.isArray(data.presupuesto) && data.presupuesto.length
+                ? data.presupuesto
+                : initialState.presupuesto,
+
+            cronograma:
+              Array.isArray(data.cronograma) && data.cronograma.length
+                ? data.cronograma
+                : initialState.cronograma,
+          });
         } else {
           setForm(initialState);
         }
@@ -1589,6 +1756,115 @@ function FichaDesafioDocente({ uid, perfil }) {
         ...prev[section],
         [field]: value,
       },
+    }));
+  };
+
+  const generarSugerenciasProductos = () => {
+    const titulo = (form.identificacion_proyecto?.titulo_proyecto || "").toLowerCase();
+    const linea = (form.identificacion_proyecto?.linea_investigacion || "").toLowerCase();
+    const areaTematica = (form.identificacion_proyecto?.area_tematica || "").toLowerCase();
+    const tieneEquipo = Array.isArray(form.equipo_trabajo) && form.equipo_trabajo.length > 1;
+    const tieneASC =
+      Array.isArray(form.apropiacion_social) &&
+      form.apropiacion_social.some(
+        (a) => (a.actividad || "").trim() || (a.objetivo || "").trim()
+      );
+
+    const sugerencias = [];
+
+    // GNC obligatorio
+    sugerencias.push({
+      categoria: "Producto de Generación de Nuevo Conocimiento (GNC)",
+      subcategoria: "Artículo científico",
+      fecha_entrega: "",
+      motivo: "El proyecto puede generar resultados publicables.",
+      seleccionado: true,
+    });
+
+    // DT si hay software, modelo, sistema, prototipo
+    if (
+      titulo.includes("software") ||
+      titulo.includes("modelo") ||
+      titulo.includes("sistema") ||
+      titulo.includes("prototipo")
+    ) {
+      sugerencias.push({
+        categoria: "Producto de Desarrollo Tecnológico (DT)",
+        subcategoria: "Software registrado",
+        fecha_entrega: "",
+        motivo: "El proyecto plantea desarrollo tecnológico susceptible de registro.",
+        seleccionado: true,
+      });
+    } else {
+      sugerencias.push({
+        categoria: "Producto de Desarrollo Tecnológico (DT)",
+        subcategoria: "Prototipo funcional",
+        fecha_entrega: "",
+        motivo: "El proyecto puede derivar en una solución tecnológica validable.",
+        seleccionado: true,
+      });
+    }
+
+    // ASC
+    if (tieneASC || titulo.includes("comunidad") || titulo.includes("salud")) {
+      sugerencias.push({
+        categoria: "Producto Apropiación Social del Conocimiento (ASC)",
+        subcategoria: "Taller de apropiación social",
+        fecha_entrega: "",
+        motivo: "El proyecto tiene potencial de socialización y transferencia.",
+        seleccionado: true,
+      });
+    }
+
+    // FRH
+    if (tieneEquipo) {
+      sugerencias.push({
+        categoria: "Producto de Formación del Recurso Humano (FRH)",
+        subcategoria: "Trabajo de grado de pregrado",
+        fecha_entrega: "",
+        motivo: "El proyecto involucra equipo de trabajo y formación investigativa.",
+        seleccionado: true,
+      });
+    } else {
+      sugerencias.push({
+        categoria: "Producto de Formación del Recurso Humano (FRH)",
+        subcategoria: "Formación de semillero",
+        fecha_entrega: "",
+        motivo: "El proyecto puede fortalecer procesos formativos en investigación.",
+        seleccionado: true,
+      });
+    }
+
+    setProductosSugeridos(sugerencias);
+  };
+
+  const agregarSugeridosAProductos = () => {
+    const seleccionados = productosSugeridos.filter((p) => p.seleccionado);
+
+    if (!seleccionados.length) return;
+
+    const actuales = Array.isArray(form.productos) ? form.productos : [];
+
+    const nuevos = seleccionados.filter(
+      (sug) =>
+        !actuales.some(
+          (p) =>
+            (p.categoria || "").trim() === sug.categoria &&
+            (p.subcategoria || "").trim() === sug.subcategoria
+        )
+    );
+
+    setForm((prev) => ({
+      ...prev,
+      productos: [
+        ...prev.productos,
+        ...nuevos.map((x) => ({
+          categoria: x.categoria,
+          subcategoria: x.subcategoria,
+          fecha_entrega: "",
+          obligatorio: false,
+        })),
+      ],
     }));
   };
 
@@ -1685,17 +1961,6 @@ function FichaDesafioDocente({ uid, perfil }) {
             style={styles.secondaryBtn}
           >
             Generar Word
-          </button>
-
-          <button
-            type="button"
-            onClick={async () => {
-              await guardarFicha();
-              generarPDF(form);
-            }}
-            style={styles.secondaryBtn}
-          >
-            Generar PDF
           </button>
 
           {err ? <div style={styles.inlineError}>{err}</div> : null}
@@ -1967,7 +2232,7 @@ function FichaDesafioDocente({ uid, perfil }) {
             <textarea
               value={form.formulacion.objetivo_general}
               onChange={(e) => setSectionField("formulacion", "objetivo_general", e.target.value)}
-              style={styles.textarea}
+              style={{ ...styles.textarea, minHeight: 70 }}
             />
           </div>
 
@@ -1976,7 +2241,7 @@ function FichaDesafioDocente({ uid, perfil }) {
             <textarea
               value={form.formulacion.objetivos_especificos}
               onChange={(e) => setSectionField("formulacion", "objetivos_especificos", e.target.value)}
-              style={styles.textarea}
+              style={{ ...styles.textarea, minHeight: 150 }}
             />
           </div>
         </div>
@@ -2119,9 +2384,18 @@ function FichaDesafioDocente({ uid, perfil }) {
                 <input
                   type="date"
                   value={item.fecha_entrega}
-                  onChange={(e) =>
-                    setArrayField("productos", idx, "fecha_entrega", e.target.value)
-                  }
+                  max={form?.datos_generales?.fecha_fin || ""}
+                  onChange={(e) =>{
+                    const fecha = e.target.value;
+
+                    if (fechaFinProyecto && fecha > fechaFinProyecto) {
+                      setErr("La fecha de entrega del producto no puede superar la fecha fin del proyecto.");
+                      return;
+                    }
+
+                    setErr("");
+                    setArrayField("productos", idx, "fecha_entrega", fecha);
+                  }}
                   style={{...styles.input, maxWidth: 110}}
                 />
               </div>
@@ -2154,59 +2428,146 @@ function FichaDesafioDocente({ uid, perfil }) {
         </div>
       </Card>
 
-      <Card title="Impactos esperados">
-        <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5, marginBottom: 8 }}>
-          Indique todos los impactos que se van a generar en las empresas, comunidades u
-          organizaciones al ejecutar el proyecto. Los indicadores verificables de impacto
-          deben dar cuenta del número de personas o empresas beneficiadas, mejoras
-          potenciadas con los resultados del proyecto, transferencia de conocimiento,
-          fortalecimiento institucional u otros efectos derivados de la implementación
-          del proyecto.
-        </div>
+      <Card title="Productos sugeridos según el proyecto">
         <div style={{ display: "grid", gap: 10 }}>
-          <div>
-            <div style={styles.label}>Desarrollo regional</div>
-            <textarea
-              value={form.impactos.desarrollo_regional}
-              onChange={(e) =>
-                setSectionField("impactos", "desarrollo_regional", e.target.value)
-              }
-              style={styles.textarea}
-            />
+          <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5 }}>
+            A partir del título, línea de investigación, área temática y alcance del proyecto,
+            el sistema propone productos potenciales de GNC, DT, ASC y FRH. Seleccione los
+            que desee incorporar a la sección de productos esperados.
           </div>
 
-          <div>
-            <div style={styles.label}>Impacto económico</div>
-            <textarea
-              value={form.impactos.economico}
-              onChange={(e) =>
-                setSectionField("impactos", "economico", e.target.value)
-              }
-              style={styles.textarea}
-            />
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={generarSugerenciasProductos}
+              style={styles.secondaryBtn}
+            >
+              Generar sugerencias
+            </button>
+
+            <button
+              type="button"
+              onClick={agregarSugeridosAProductos}
+              style={styles.primaryBtn}
+            >
+              Agregar seleccionados
+            </button>
           </div>
 
-          <div>
-            <div style={styles.label}>Impacto ambiental</div>
-            <textarea
-              value={form.impactos.ambiental}
-              onChange={(e) =>
-                setSectionField("impactos", "ambiental", e.target.value)
-              }
-              style={styles.textarea}
-            />
+          {productosSugeridos.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                border: "1px solid rgba(45,156,219,0.20)",
+                borderRadius: 12,
+                padding: 12,
+                background: "rgba(45,156,219,0.04)",
+              }}
+            >
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <input
+                  type="checkbox"
+                  checked={!!item.seleccionado}
+                  onChange={(e) => {
+                    const next = [...productosSugeridos];
+                    next[idx].seleccionado = e.target.checked;
+                    setProductosSugeridos(next);
+                  }}
+                />
+
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ fontWeight: 900, color: "#1B75BC" }}>
+                    {item.categoria}
+                  </div>
+                  <div style={{ fontWeight: 800 }}>{item.subcategoria}</div>
+                  <div style={{ fontSize: 12, color: "#4B5563" }}>
+                    {item.motivo}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card title="Impactos esperados">
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5, marginBottom: 8 }}>
+            Indique todos los impactos que se van a generar en las empresas, comunidades u
+            organizaciones al ejecutar el proyecto. Los indicadores verificables de impacto
+            deben dar cuenta del número de personas o empresas beneficiadas, mejoras
+            potenciadas con los resultados del proyecto, transferencia de conocimiento,
+            fortalecimiento institucional u otros efectos derivados de la implementación
+            del proyecto.
           </div>
 
-          <div>
-            <div style={styles.label}>Fortalecimiento institucional (UDI)</div>
-            <textarea
-              value={form.impactos.fortalecimiento_udi}
-              onChange={(e) =>
-                setSectionField("impactos", "fortalecimiento_udi", e.target.value)
-              }
-              style={styles.textarea}
-            />
-          </div>
+          {(Array.isArray(form.impactos) ? form.impactos : []).map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: "grid",
+                gap: 12,
+                padding: 14,
+                border: "1px solid rgba(45,156,219,0.18)",
+                borderRadius: 12,
+                background: "rgba(45,156,219,0.03)",
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 900,
+                  color: "#1B75BC",
+                  fontSize: 15,
+                  borderBottom: "1px solid rgba(45,156,219,0.15)",
+                  paddingBottom: 6,
+                }}
+              >
+                {item.tipo}
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 12,
+                  alignItems: "start",
+                }}
+              >
+                <div>
+                  <div style={styles.label}>Descripción del impacto</div>
+                  <textarea
+                    value={item.descripcion}
+                    onChange={(e) =>
+                      setArrayField("impactos", idx, "descripcion", e.target.value)
+                    }
+                    style={{ ...styles.textarea, minHeight: 80, maxWidth: 350 }}
+                  />
+                </div>
+
+                <div>
+                  <div style={styles.label}>Beneficiarios</div>
+                  <textarea
+                    value={item.beneficiarios}
+                    onChange={(e) =>
+                      setArrayField("impactos", idx, "beneficiarios", e.target.value)
+                    }
+                    style={{ ...styles.textarea, minHeight: 80, maxWidth: 350 }}
+                  />
+                </div>
+
+                <div>
+                  <div style={styles.label}>Indicadores verificables</div>
+                  <textarea
+                    value={item.indicadores}
+                    onChange={(e) =>
+                      setArrayField("impactos", idx, "indicadores", e.target.value)
+                    }
+                    style={{ ...styles.textarea, minHeight: 80, maxWidth: 350 }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
 
@@ -2448,9 +2809,18 @@ function FichaDesafioDocente({ uid, perfil }) {
                 <input
                   type="date"
                   value={item.fecha_fin}
-                  onChange={(e) =>
-                    setArrayField("cronograma", idx, "fecha_fin", e.target.value)
-                  }
+                  max={form?.datos_generales?.fecha_fin || ""}
+                  onChange={(e) =>{
+                    const fecha = e.target.value;
+
+                    if (fechaFinProyecto && fecha > fechaFinProyecto) {
+                      setErr("La fecha del cronograma no puede superar la fecha fin del proyecto.");
+                      return;
+                    }
+
+                    setErr("");
+                    setArrayField("cronograma", idx, "fecha_fin", fecha);
+                  }}
                   style={{...styles.input, maxWidth: 120}}
                 />
               </div>
