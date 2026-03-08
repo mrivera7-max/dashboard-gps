@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import gpsLogo from "./assets/logo-gps.png";
 import udiLogo from "./assets/logo-udi.png";
 import { auth, db } from "./firebaseConfig";
+import { generarWordFicha } from "./utils/generarWordFicha";
+import { generarPDF } from "./utils/generarPDF";
 
 
 import {
@@ -16,6 +18,7 @@ import {
   updateDoc,
   where,
   getDocs,
+  getDoc,
   limit,
   runTransaction,
 } from "firebase/firestore";
@@ -38,9 +41,52 @@ const categoriaMincienciasMap = {
   SC: "Sin Categoría"
 };
 
+const LINEAS_GRUPO = [
+  "Robótica",
+  "Control",
+  "Procesamiento de Señales",
+  "Telecomunicaciones",
+];
+
+const ODS_LIST = [
+      "ODS 1 - Fin de la pobreza",
+      "ODS 2 - Hambre cero",
+      "ODS 3 - Salud y bienestar",
+      "ODS 4 - Educación de calidad",
+      "ODS 5 - Igualdad de género",
+      "ODS 6 - Agua limpia y saneamiento",
+      "ODS 7 - Energía asequible y no contaminante",
+      "ODS 8 - Trabajo decente y crecimiento económico",
+      "ODS 9 - Industria, innovación e infraestructura",
+      "ODS 10 - Reducción de desigualdades",
+      "ODS 11 - Ciudades y comunidades sostenibles",
+      "ODS 12 - Producción y consumo responsables",
+      "ODS 13 - Acción por el clima",
+      "ODS 14 - Vida submarina",
+      "ODS 15 - Vida de ecosistemas terrestres",
+      "ODS 16 - Paz, justicia e instituciones sólidas",
+      "ODS 17 - Alianzas para lograr los objetivos",
+    ];
+
+const CATEGORIAS_PRODUCTOS_ESPERADOS = [
+  "Producto de Generación de Nuevo Conocimiento (GNC)",
+  "Producto de Desarrollo Tecnológico (DT)",
+  "Producto Apropiación Social del Conocimiento (ASC)",
+  "Producto de Formación del Recurso Humano (FRH)",
+];
+
+const AREAS_CONOCIMIENTO_MINCIENCIAS = [
+    "Ciencias Naturales",
+    "Ingeniería y Tecnología",
+    "Ciencias Médicas y de la Salud",
+    "Ciencias Agrícolas",
+    "Ciencias Sociales",
+    "Humanidades",
+  ];
+
 export default function DocenteDashboard({ logout }) {
   const role = useMemo(() => "docente", []);
-  const [activeView, setActiveView] = useState("perfil"); // perfil | produccion
+  const [activeView, setActiveView] = useState("perfil"); // perfil | produccion | ficha | conexiones
 
   const user = auth.currentUser;
   const uid = user?.uid;
@@ -225,6 +271,11 @@ export default function DocenteDashboard({ logout }) {
               onClick={() => setActiveView("produccion")}
             />
             <NavBtn
+              text="Ficha de desafío"
+              active={activeView === "ficha"}
+              onClick={() => setActiveView("ficha")}
+            />
+            <NavBtn
               text="Conexiones"
               active={activeView === "conexiones"}
               onClick={() => setActiveView("conexiones")}
@@ -277,6 +328,8 @@ export default function DocenteDashboard({ logout }) {
             <PerfilDocente perfil={perfil} emailFallback={email} />
           ) : activeView === "produccion" ? (
             <ProduccionDocente uid={uid} perfil={perfil} />
+          ) : activeView === "ficha" ? (
+            <FichaDesafioDocente uid={uid} perfil={perfil} />
           ) : (
             <ConexionesDocente perfil={perfil} />
           )}
@@ -520,12 +573,7 @@ function ProduccionDocente({ uid, perfil }) {
   const [lineaInvestigacion, setLineaInvestigacion] = useState("");
   const [descripcionProyecto, setDescripcionProyecto] = useState("");
 
-  const LINEAS_GRUPO = [
-    "Robótica",
-    "Control",
-    "Procesamiento de Señales",
-    "Telecomunicaciones",
-  ];
+  
 
   const [form, setForm] = useState({
     titulo: "",
@@ -926,6 +974,10 @@ function ProduccionDocente({ uid, perfil }) {
     FRH: "Formación de Recurso Humano"
   };
 
+  
+
+  
+
   const perfilPredominante = nombresCategorias[codigoPerfil] || codigoPerfil;
 
   if (!idInvestigador) {
@@ -1050,8 +1102,11 @@ function ProduccionDocente({ uid, perfil }) {
                 onChange={(e) => setLineaInvestigacion(e.target.value)}
                 style={styles.input}
               >
-                {LINEAS_GRUPO.map((l) => (
-                  <option key={l} value={l}>{l}</option>
+                <option value="">Seleccionar</option>
+                {LINEAS_GRUPO.map((linea) => (
+                  <option key={linea} value={linea}>
+                    {linea}
+                  </option>
                 ))}
               </select>
             </div>
@@ -1414,6 +1469,1160 @@ function ConexionesDocente({ perfil }) {
   );
 }
 
+function FichaDesafioDocente({ uid, perfil }) {
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState("");
+
+  const [loaded, setLoaded] = useState(false);
+
+  const initialState = useMemo(() => ({
+    datos_generales: {
+      cedula: perfil?.identificacion || "",
+      nombre_investigador: `${perfil?.nombres || ""} ${perfil?.apellidos || ""}`.trim(),
+      programa: "",
+      horas_dedicacion: "",
+      fecha_inicio: "",
+      fecha_fin: "",
+    },
+
+    identificacion_proyecto: {
+      titulo_proyecto: "",
+      grupo_investigacion: "GPS",
+      linea_investigacion: "Robótica",
+      area_tematica: "",
+      area_conocimiento: "",
+      ods: [""],
+    },
+
+    formulacion: {
+      problema: "",
+      justificacion_viabilidad: "",
+      objetivo_general: "",
+      objetivos_especificos: "",
+    },
+    equipo_trabajo: [
+      {
+        nombre: `${perfil?.nombres || ""} ${perfil?.apellidos || ""}`.trim(),
+        grupo: "GPS",
+        rol: "Investigador principal",
+        cvlac: perfil?.conexiones?.identificadores?.cvlac?.url || "",
+      },
+    ],
+    productos: [
+      {
+        categoria: "",
+        subcategoria: "",
+        fecha_entrega: "",
+      },
+    ],
+    impactos: {
+      desarrollo_regional: "",
+      economico: "",
+      ambiental: "",
+      fortalecimiento_udi: "",
+    },
+    apropiacion_social: [
+      {
+        actividad: "",
+        comunidades_empresas: "",
+        objetivo: "",
+      },
+    ],
+    presupuesto: [
+      {
+        rubro: "",
+        justificacion: "",
+        valor: "",
+      },
+    ],
+    cronograma: [
+      {
+        hito: "",
+        descripcion: "",
+        fecha_inicio: "",
+        fecha_fin: "",
+        horas_asignadas: "",
+        entregable: "",
+      },
+    ],
+
+    firmas: {
+      preparado_por: "",
+      revisado_por: "",
+      aprobado_rector: "",
+      aprobado_investigaciones: "",
+    },
+
+  }), [perfil]);
+
+  const [form, setForm] = useState(initialState);
+
+   useEffect(() => {
+    if (!uid || loaded) return;
+
+    const cargarFicha = async () => {
+      try {
+        const ref = doc(db, "fichas_desafio", uid);
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) {
+          setForm(snap.data());
+        } else {
+          setForm(initialState);
+        }
+
+        setLoaded(true);
+      } catch (e) {
+        console.error(e);
+        setErr("Error cargando ficha");
+      }
+    };
+
+    cargarFicha();
+  }, [uid, loaded]);
+
+  const setSectionField = (section, field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value,
+      },
+    }));
+  };
+
+  const setArrayField = (section, index, field, value) => {
+    setForm((prev) => {
+      const next = [...prev[section]];
+      next[index] = { ...next[index], [field]: value };
+      return { ...prev, [section]: next };
+    });
+  };
+
+  const addArrayItem = (section, emptyRow) => {
+    setForm((prev) => ({
+      ...prev,
+      [section]: [...prev[section], emptyRow],
+    }));
+  };
+
+  const removeArrayItem = (section, index) => {
+    setForm((prev) => ({
+      ...prev,
+      [section]: prev[section].filter((_, i) => i !== index),
+    }));
+  };
+
+  const guardarFicha = async () => {
+    try {
+      setErr("");
+      setOk("");
+
+      if (!uid) {
+        setErr("No hay sesión.");
+        return;
+      }
+
+      if (!form.identificacion_proyecto.titulo_proyecto.trim()) {
+        setErr("El título del proyecto es obligatorio.");
+        return;
+      }
+
+      setSaving(true);
+
+      await setDoc(
+        doc(db, "fichas_desafio", uid),
+        {
+          ...form,
+          uid,
+          updatedAt: serverTimestamp(),
+          createdBy: uid,
+        },
+        { merge: true }
+      );
+
+      setOk("Ficha guardada ✅");
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || "Error guardando ficha");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const contarPalabras = (texto) => {
+    if (!texto) return 0;
+    return texto.trim().split(/\s+/).filter(Boolean).length;
+  };
+
+  const totalPresupuesto = (Array.isArray(form.presupuesto) ? form.presupuesto : []).reduce(
+    (acc, item) => acc + (Number(String(item.valor || "").replace(/[^\d.-]/g, "")) || 0),
+    0
+  );
+
+  const totalHorasSemana = Number(form?.datos_generales?.horas_dedicacion) || 0;
+
+  const totalHorasProyecto = (Array.isArray(form.cronograma) ? form.cronograma : []).reduce(
+    (acc, item) => acc + (Number(item.horas_asignadas) || 0),
+    0
+  );
+
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      <Card title="Ficha de desafío">
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={guardarFicha} style={styles.primaryBtn} disabled={saving}>
+            {saving ? "Guardando..." : "Guardar ficha"}
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await guardarFicha();
+              generarWordFicha(form);
+            }}
+            style={styles.secondaryBtn}
+          >
+            Generar Word
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await guardarFicha();
+              generarPDF(form);
+            }}
+            style={styles.secondaryBtn}
+          >
+            Generar PDF
+          </button>
+
+          {err ? <div style={styles.inlineError}>{err}</div> : null}
+          {ok ? <div style={styles.inlineOk}>{ok}</div> : null}
+        </div>
+      </Card>
+
+      <Card title="Datos generales">
+        <div style={styles.formGrid}>
+          
+          <div style={{ gridColumn: "span 1" }}>
+            <div style={styles.label}>Cédula</div>
+            <input
+              type="number"
+              value={form.datos_generales.cedula}
+              onChange={(e) =>
+                setSectionField("datos_generales", "cedula", e.target.value)
+              }
+              style={{ ...styles.input, maxWidth: 90 }}
+            />
+          </div>
+
+          <div style={{ gridColumn: "span 3" }}>
+            <div style={styles.label}>Nombre del investigador</div>
+            <input
+              value={form.datos_generales.nombre_investigador}
+              onChange={(e) => setSectionField("datos_generales", "nombre_investigador", e.target.value)}
+              style={{ ...styles.input, maxWidth: 400 }}
+            />
+          </div>
+
+          <div style={{ gridColumn: "span 2" }}>
+            <div style={styles.label}>Programa</div>
+            <input
+              value={form.datos_generales.programa}
+              onChange={(e) =>
+                setSectionField("datos_generales", "programa", e.target.value)
+              }
+              style={styles.input}
+            />
+          </div>
+
+          <div style={{ gridColumn: "1 / 2", gridRow: "2"}}>
+            <div style={styles.label}>Horas de dedicación</div>
+            <input
+              type="number"
+              value={form.datos_generales.horas_dedicacion}
+              onChange={(e) =>
+                setSectionField(
+                  "datos_generales",
+                  "horas_dedicacion",
+                  e.target.value
+                )
+              }
+              style={{ ...styles.input, maxWidth: 90 }}
+            />
+          </div>
+
+          <div style={{ gridColumn: "2 / 3", gridRow: "2"}}>
+            <div style={styles.label}>Fecha inicio</div>
+            <input
+              type="date"
+              value={form.datos_generales.fecha_inicio}
+              onChange={(e) =>
+                setSectionField("datos_generales", "fecha_inicio", e.target.value)
+              }
+              style={{ ...styles.input, maxWidth: 120 }}
+            />
+          </div>
+
+          <div style={{ gridColumn: "3 / 4", gridRow: "2" }}>
+            <div style={styles.label}>Fecha fin</div>
+            <input
+              type="date"
+              value={form.datos_generales.fecha_fin}
+              onChange={(e) =>
+                setSectionField("datos_generales", "fecha_fin", e.target.value)
+              }
+              style={{ ...styles.input, maxWidth: 120 }}
+            />
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Identificación del proyecto">
+        <div style={styles.formGrid}>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={styles.label}>Título del proyecto</div>
+            <input
+              value={form.identificacion_proyecto.titulo_proyecto}
+              onChange={(e) => setSectionField("identificacion_proyecto", "titulo_proyecto", e.target.value)}
+              style={styles.input}
+            />
+          </div>
+
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={styles.label}>Área de conocimiento</div>
+
+            <select
+              value={form.identificacion_proyecto.area_conocimiento}
+              onChange={(e) =>
+                setSectionField(
+                  "identificacion_proyecto",
+                  "area_conocimiento",
+                  e.target.value
+                )
+              }
+              style={styles.input}
+            >
+              <option value="">Seleccionar área de conocimiento</option>
+
+              {AREAS_CONOCIMIENTO_MINCIENCIAS.map((area) => (
+                <option key={area} value={area}>
+                  {area}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div style={styles.label}>Grupo de investigación</div>
+            <input
+              value={form.identificacion_proyecto.grupo_investigacion}
+              onChange={(e) => setSectionField("identificacion_proyecto", "grupo_investigacion", e.target.value)}
+              style={{...styles.input, maxWidth: 80}}
+            />
+          </div>
+          
+          <div style={{ gridColumn: "2 / 4" }}>
+            <div style={styles.label}>Línea de investigación</div>
+            <select
+              value={form.identificacion_proyecto.linea_investigacion}
+              onChange={(e) =>
+                setSectionField("identificacion_proyecto", "linea_investigacion", e.target.value)
+              }
+              style={{...styles.input, maxWidth: 300}}
+            >
+              <option value="">Seleccionar</option>
+              {LINEAS_GRUPO.map((linea) => (
+                <option key={linea} value={linea}>
+                  {linea}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div style={{ gridColumn: "4 / 6" }}>
+            <div style={styles.label}>Área temática</div>
+            <input
+              value={form.identificacion_proyecto.area_tematica}
+              onChange={(e) => setSectionField("identificacion_proyecto", "area_tematica", e.target.value)}
+              style={styles.input}
+            />
+          </div>
+
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={styles.label}>ODS asociados</div>
+
+            {form.identificacion_proyecto.ods.map((ods, idx) => (
+              <div key={idx} style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+
+                <select
+                  value={ods}
+                  onChange={(e) => {
+                    const next = [...form.identificacion_proyecto.ods];
+                    next[idx] = e.target.value;
+
+                    setSectionField("identificacion_proyecto", "ods", next);
+                  }}
+                  style={styles.input}
+                >
+                  <option value="">Seleccionar ODS</option>
+
+                  {ODS_LIST.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = form.identificacion_proyecto.ods.filter((_, i) => i !== idx);
+                    setSectionField("identificacion_proyecto", "ods", next);
+                  }}
+                  style={styles.secondaryBtn}
+                >
+                  Eliminar
+                </button>
+
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                const next = [...form.identificacion_proyecto.ods, ""];
+                setSectionField("identificacion_proyecto", "ods", next);
+              }}
+              style={styles.secondaryBtn}
+            >
+              Agregar ODS
+            </button>
+          </div>
+      
+        </div>
+      </Card>
+
+      <Card title="Formulación">
+        <div style={{ display: "grid", gap: 10 }}>
+          <div>
+            <div style={styles.label}>Noción del problema</div>
+
+            <div style={{fontSize:12, color:"#374151", marginBottom:6}}>
+              Describa el problema a resolver, las características más críticas del mismo,
+              vinculando el fenómeno específico que se pretende investigar. Utilizar entre
+              <b>150 y 200 palabras</b>, en un solo párrafo, sin citas o referencias bibliográficas.
+            </div>
+
+            <textarea
+              value={form.formulacion.problema}
+              onChange={(e) => {
+                const texto = e.target.value;
+                const palabras = contarPalabras(texto);
+
+                if (palabras <= 200) {
+                  setSectionField("formulacion", "problema", texto);
+                }
+              }}
+              style={styles.textarea}
+            />
+
+            <div style={{fontSize:12, marginTop:6, fontWeight:700}}>
+              {contarPalabras(form.formulacion.problema)} / 200 palabras
+            </div>
+          </div>
+
+          <div>
+            <div style={styles.label}>Justificación</div>
+
+            <div style={{fontSize:12, color:"#374151", marginBottom:6}}>
+              Especifique de forma clara y concisa la solución planteada con el desarrollo del
+              proyecto. Considere la conveniencia, relevancia social, implicaciones prácticas,
+              valor teórico y utilidad metodológica. Utilizar entre <b>150 y 200 palabras</b>,
+              en un solo párrafo, sin citas o referencias bibliográficas.
+            </div>
+
+            <textarea
+              value={form.formulacion.justificacion_viabilidad}
+              onChange={(e) => {
+                const texto = e.target.value;
+                const palabras = contarPalabras(texto);
+
+                if (palabras <= 200) {
+                  setSectionField("formulacion", "justificacion_viabilidad", texto);
+                }
+              }}
+              style={styles.textarea}
+            />
+
+            <div style={{fontSize:12, marginTop:6, fontWeight:700}}>
+              {contarPalabras(form.formulacion.justificacion_viabilidad)} / 200 palabras
+            </div>
+          </div>
+
+          <div>
+            <div style={styles.label}>Objetivo general</div>
+            <textarea
+              value={form.formulacion.objetivo_general}
+              onChange={(e) => setSectionField("formulacion", "objetivo_general", e.target.value)}
+              style={styles.textarea}
+            />
+          </div>
+
+          <div>
+            <div style={styles.label}>Objetivos específicos</div>
+            <textarea
+              value={form.formulacion.objetivos_especificos}
+              onChange={(e) => setSectionField("formulacion", "objetivos_especificos", e.target.value)}
+              style={styles.textarea}
+            />
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Equipo de trabajo Interdisiplinar (si aplica)">
+        <div style={{ display: "grid", gap: 10 }}>
+          {form.equipo_trabajo.map((item, idx) => (
+            
+            <div key={idx} style={styles.formGrid}>
+
+              <div style={{ gridColumn: "1 / 3" }}>
+                <div style={styles.label}>Nombre</div>
+                <input
+                  value={item.nombre}
+                  onChange={(e) =>
+                    setArrayField("equipo_trabajo", idx, "nombre", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 300}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "3 / 4" }}>
+                <div style={styles.label}>Grupo</div>
+                <input
+                  value={item.grupo}
+                  onChange={(e) =>
+                    setArrayField("equipo_trabajo", idx, "grupo", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 100}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "4 / 5" }}>
+                <div style={styles.label}>Rol</div>
+                <input
+                  value={item.rol}
+                  onChange={(e) =>
+                    setArrayField("equipo_trabajo", idx, "rol", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 140}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "5 / 7" }}>
+                <div style={styles.label}>CvLAC</div>
+                <input
+                  value={item.cvlac}
+                  onChange={(e) =>
+                    setArrayField("equipo_trabajo", idx, "cvlac", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 450}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "8/ 8", display: "flex", alignItems: "end" }}>
+                <button
+                  type="button"
+                  onClick={() => removeArrayItem("equipo_trabajo", idx)}
+                  style={styles.secondaryBtn}
+                >
+                  Eliminar
+                </button>
+              </div>
+
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={() =>
+              addArrayItem("equipo_trabajo", {
+                nombre: "",
+                grupo: "",
+                rol: "",
+                cvlac: "",
+              })
+            }
+            style={styles.secondaryBtn}
+          >
+            Agregar integrante
+          </button>
+        </div>
+      </Card>
+
+      <Card title="Productos esperados">
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5 }}>
+            En este aspecto, elija los productos que fortalezcan y fomenten la sostenibilidad
+            de los productos de investigación con alta calidad investigativa de la UDI.
+            Debe seleccionar por lo menos un producto de <b>Generación de Nuevo Conocimiento (GNC)</b> y
+            <b> Desarrollo Tecnológico (DT)</b>, un producto de
+            <b> Apropiación Social del Conocimiento (ASC)</b> y un producto de
+            <b> Formación del Recurso Humano (FRH)</b>. También deben incluir informe final
+            de las actividades desarrolladas en el grupo o semillero de investigación,
+            evidencia de actualización de CvLAC o GrupLAC, este último si es líder de un grupo.
+          </div>
+
+          {form.productos.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(8, 1fr)",
+                gap: 12,
+                alignItems: "end",
+              }}
+            >
+              <div style={{ gridColumn: "1 / 4" }}>
+                <div style={styles.label}>Categoría</div>
+                <select
+                  value={item.categoria}
+                  onChange={(e) =>
+                    setArrayField("productos", idx, "categoria", e.target.value)
+                  }
+                  style={styles.input}
+                >
+                  <option value="">Seleccionar categoría</option>
+                  {CATEGORIAS_PRODUCTOS_ESPERADOS.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ gridColumn: "4 / 7" }}>
+                <div style={styles.label}>Subcategoría</div>
+                <input
+                  value={item.subcategoria}
+                  onChange={(e) =>
+                    setArrayField("productos", idx, "subcategoria", e.target.value)
+                  }
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={{ gridColumn: "8 / 8" }}>
+                <div style={styles.label}>Fecha de entrega</div>
+                <input
+                  type="date"
+                  value={item.fecha_entrega}
+                  onChange={(e) =>
+                    setArrayField("productos", idx, "fecha_entrega", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 110}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "9 / 9", display: "flex", alignItems: "end" }}>
+                <button
+                  type="button"
+                  onClick={() => removeArrayItem("productos", idx)}
+                  style={styles.secondaryBtn}
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={() =>
+              addArrayItem("productos", {
+                categoria: "",
+                subcategoria: "",
+                fecha_entrega: "",
+              })
+            }
+            style={styles.secondaryBtn}
+          >
+            Agregar producto esperado
+          </button>
+        </div>
+      </Card>
+
+      <Card title="Impactos esperados">
+        <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5, marginBottom: 8 }}>
+          Indique todos los impactos que se van a generar en las empresas, comunidades u
+          organizaciones al ejecutar el proyecto. Los indicadores verificables de impacto
+          deben dar cuenta del número de personas o empresas beneficiadas, mejoras
+          potenciadas con los resultados del proyecto, transferencia de conocimiento,
+          fortalecimiento institucional u otros efectos derivados de la implementación
+          del proyecto.
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div>
+            <div style={styles.label}>Desarrollo regional</div>
+            <textarea
+              value={form.impactos.desarrollo_regional}
+              onChange={(e) =>
+                setSectionField("impactos", "desarrollo_regional", e.target.value)
+              }
+              style={styles.textarea}
+            />
+          </div>
+
+          <div>
+            <div style={styles.label}>Impacto económico</div>
+            <textarea
+              value={form.impactos.economico}
+              onChange={(e) =>
+                setSectionField("impactos", "economico", e.target.value)
+              }
+              style={styles.textarea}
+            />
+          </div>
+
+          <div>
+            <div style={styles.label}>Impacto ambiental</div>
+            <textarea
+              value={form.impactos.ambiental}
+              onChange={(e) =>
+                setSectionField("impactos", "ambiental", e.target.value)
+              }
+              style={styles.textarea}
+            />
+          </div>
+
+          <div>
+            <div style={styles.label}>Fortalecimiento institucional (UDI)</div>
+            <textarea
+              value={form.impactos.fortalecimiento_udi}
+              onChange={(e) =>
+                setSectionField("impactos", "fortalecimiento_udi", e.target.value)
+              }
+              style={styles.textarea}
+            />
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Apropiación social del conocimiento">
+        <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5, marginBottom: 8 }}>
+          En línea con el nuevo modelo de medición de grupos de investigación de
+          MinCiencias 2024, se hace énfasis en la apropiación social del conocimiento,
+          siguiendo una metodología específica para estas actividades. Describa las
+          actividades de apropiación social a realizar y los objetivos que se esperan
+          alcanzar con las comunidades, empresas u organizaciones beneficiadas.
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          {form.apropiacion_social.map((item, idx) => (
+            <div key={idx} style={styles.formGrid}>
+
+              <div style={{ gridColumn: "1 / 3" }}>
+                <div style={styles.label}>Actividad</div>
+                <input
+                  value={item.actividad}
+                  onChange={(e) =>
+                    setArrayField("apropiacion_social", idx, "actividad", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 300}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "3 / 5" }}>
+                <div style={styles.label}>Comunidades / Empresas</div>
+                <input
+                  value={item.comunidades_empresas}
+                  onChange={(e) =>
+                    setArrayField(
+                      "apropiacion_social",
+                      idx,
+                      "comunidades_empresas",
+                      e.target.value
+                    )
+                  }
+                  style={{...styles.input, maxWidth: 300}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "5 / 8" }}>
+                <div style={styles.label}>Objetivo</div>
+                <input
+                  value={item.objetivo}
+                  onChange={(e) =>
+                    setArrayField("apropiacion_social", idx, "objetivo", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 460}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "8 / 8", display: "flex", alignItems: "end" }}>
+                <button
+                  type="button"
+                  onClick={() => removeArrayItem("apropiacion_social", idx)}
+                  style={styles.secondaryBtn}
+                >
+                  Eliminar
+                </button>
+              </div>
+
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={() =>
+              addArrayItem("apropiacion_social", {
+                actividad: "",
+                comunidades_empresas: "",
+                objetivo: "",
+              })
+            }
+            style={styles.secondaryBtn}
+          >
+            Agregar actividad
+          </button>
+        </div>
+      </Card>
+
+      <Card title="Presupuesto estimado">
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5, marginBottom: 8 }}>
+            En este aspecto no considerar las horas de desarrollo institucional asignadas
+            de investigaciones para el desarrollo del proyecto.
+          </div>
+
+          {form.presupuesto.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(8, 1fr)",
+                gap: 12,
+                alignItems: "end",
+              }}
+            >
+              
+              <div style={{ gridColumn: "1 / 4" }}>
+                <div style={styles.label}>Rubro</div>
+                <input
+                  value={item.rubro}
+                  onChange={(e) =>
+                    setArrayField("presupuesto", idx, "rubro", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 400}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "4 / 7" }}>
+                <div style={styles.label}>Justificación</div>
+                <input
+                  value={item.justificacion}
+                  onChange={(e) =>
+                    setArrayField("presupuesto", idx, "justificacion", e.target.value)
+                  }
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={{ gridColumn: "8 / 8" }}>
+                <div style={styles.label}>Valor</div>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={item.valor}
+                  onChange={(e) =>
+                    setArrayField("presupuesto", idx, "valor", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 120}}
+                  placeholder="0"
+                />
+              </div>
+
+              <div style={{ gridColumn: "9 / 9" }}>
+                <button
+                  type="button"
+                  onClick={() => removeArrayItem("presupuesto", idx)}
+                  style={styles.secondaryBtn}
+                >
+                  Eliminar
+                </button>
+              </div>
+              
+            </div>
+          ))}
+
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() =>
+                addArrayItem("presupuesto", {
+                  rubro: "",
+                  justificacion: "",
+                  valor: "",
+                })
+              }
+              style={styles.secondaryBtn}
+            >
+              Agregar rubro
+            </button>
+
+            <div
+              style={{
+                marginLeft: "auto",
+                padding: "10px 14px",
+                borderRadius: 12,
+                background: "rgba(45,156,219,0.10)",
+                border: "1px solid rgba(45,156,219,0.25)",
+                fontWeight: 900,
+                color: "#1B75BC",
+              }}
+            >
+              Total presupuesto: ${totalPresupuesto.toLocaleString("es-CO")}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Cronograma del proyecto">
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5, marginBottom: 8 }}>
+            En este aspecto considerar los principales hitos o actividades dentro del
+            proyecto, duración, fecha de entrega y producto, resultado o evidencia de la
+            actividad que permita evidenciar su cumplimiento. También deben incluir informe
+            final de las actividades desarrolladas en el grupo o semillero de investigación,
+            evidencia de actualización de CvLAC o GrupLAC, este último si es líder de un grupo.
+          </div>
+
+          {form.cronograma.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(8, 1fr)",
+                gap: 12,
+                alignItems: "end",
+              }}
+            >
+              <div style={{ gridColumn: "1 / 3" }}>
+                <div style={styles.label}>Actividad</div>
+                <input
+                  value={item.hito}
+                  onChange={(e) =>
+                    setArrayField("cronograma", idx, "hito", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 250}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "3 / 5" }}>
+                <div style={styles.label}>Descripción</div>
+                <input
+                  value={item.descripcion}
+                  onChange={(e) =>
+                    setArrayField("cronograma", idx, "descripcion", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 250}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "5 / 5" }}>
+                <div style={styles.label}>Fecha inicio</div>
+                <input
+                  type="date"
+                  value={item.fecha_inicio}
+                  onChange={(e) =>
+                    setArrayField("cronograma", idx, "fecha_inicio", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 120}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "6 / 6" }}>
+                <div style={styles.label}>Fecha fin</div>
+                <input
+                  type="date"
+                  value={item.fecha_fin}
+                  onChange={(e) =>
+                    setArrayField("cronograma", idx, "fecha_fin", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 120}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "7 / 7" }}>
+                <div style={styles.label}>Horas</div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={item.horas_asignadas}
+                    onChange={(e) =>
+                      setArrayField("cronograma", idx, "horas_asignadas", e.target.value)
+                    }
+                    style={{...styles.input, maxWidth: 120}}
+                  />
+              </div>
+
+              <div style={{ gridColumn: "8 / 8" }}>
+                <div style={styles.label}>Entregable</div>
+                <input
+                  value={item.entregable}
+                  onChange={(e) =>
+                    setArrayField("cronograma", idx, "entregable", e.target.value)
+                  }
+                  style={{...styles.input, maxWidth: 120}}
+                />
+              </div>
+
+              <div style={{ gridColumn: "9 / 9", display: "flex", alignItems: "end" }}>
+                <button
+                  type="button"
+                  onClick={() => removeArrayItem("cronograma", idx)}
+                  style={styles.secondaryBtn}
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() =>
+                addArrayItem("cronograma", {
+                  hito: "",
+                  descripcion: "",
+                  fecha_inicio: "",
+                  fecha_fin: "",
+                  horas_asignadas: "",
+                  entregable: "",
+                })
+              }
+              style={styles.secondaryBtn}
+            >
+              Agregar actividad
+            </button>
+
+            <div
+              style={{
+                marginLeft: "auto",
+                display: "flex",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  background: "rgba(45,156,219,0.10)",
+                  border: "1px solid rgba(45,156,219,0.25)",
+                  fontWeight: 900,
+                  color: "#1B75BC",
+                }}
+              >
+                Total horas dedicadas (semana): {totalHorasSemana}
+              </div>
+
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  background: "rgba(27,117,188,0.10)",
+                  border: "1px solid rgba(27,117,188,0.25)",
+                  fontWeight: 900,
+                  color: "#0F3E68",
+                }}
+              >
+                Total horas dedicadas (total): {totalHorasProyecto}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Aprobaciones">
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 20,
+            marginTop: 10,
+          }}
+        >
+
+          <div>
+            <div style={styles.label}>Preparado por</div>
+            <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 6 }}>
+              Investigador principal
+            </div>
+            <input
+              value={form.firmas?.preparado_por || ""}
+              onChange={(e) =>
+                setSectionField("firmas", "preparado_por", e.target.value)
+              }
+              style={{...styles.input, maxWidth: 280}}
+            />
+          </div>
+
+          <div>
+            <div style={styles.label}>Revisado por</div>
+            <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 6 }}>
+              Líder grupo de investigación
+            </div>
+            <input
+              value={form.firmas.revisado_por || ""}
+              onChange={(e) =>
+                setSectionField("firmas", "revisado_por", e.target.value)
+              }
+              style={{...styles.input, maxWidth: 280}}
+            />
+          </div>
+
+          <div>
+            <div style={styles.label}>Aprobado por</div>
+            <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 6 }}>
+              Rector
+            </div>
+            <input
+              value={form.firmas.aprobado_rector || ""}
+              onChange={(e) =>
+                setSectionField("firmas", "aprobado_rector", e.target.value)
+              }
+              style={{...styles.input, maxWidth: 280}}
+            />
+          </div>
+
+          <div>
+            <div style={styles.label}>Aprobado por</div>
+            <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 6 }}>
+              Director de Investigaciones
+            </div>
+            <input
+              value={form.firmas.aprobado_investigaciones || ""}
+              onChange={(e) =>
+                setSectionField("firmas", "aprobado_investigaciones", e.target.value)
+              }
+              style={{...styles.input, maxWidth: 280}}
+            />
+          </div>
+
+        </div>
+
+      </Card>
+
+    </div>
+  );
+}
+
 function ConRow({ label, value, onToggle, onUrl }) {
   const v = value || { enabled: false, url: "" };
 
@@ -1720,9 +2929,9 @@ headerLogo: {
 
   formGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: 10,
-    marginTop: 10,
+    gridTemplateColumns: "repeat(7, 1fr)",
+    gap: 12,
+    alignItems: "end"
   },
   label: { fontSize: 12.5, fontWeight: 900, color: "#374151", marginBottom: 6 },
   input: {
