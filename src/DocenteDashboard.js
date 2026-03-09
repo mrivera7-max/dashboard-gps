@@ -599,8 +599,6 @@ function ProduccionDocente({ uid, perfil }) {
   const [lineaInvestigacion, setLineaInvestigacion] = useState("");
   const [descripcionProyecto, setDescripcionProyecto] = useState("");
 
-  
-
   const [form, setForm] = useState({
     titulo: "",
     tipo_producto: "",
@@ -1017,7 +1015,8 @@ function ProduccionDocente({ uid, perfil }) {
   }
 
   return (
-  <>
+  <div style={{ display: "grid", gap: 0 }}>
+    <div style={styles.sectionBlock}>
     <div style={styles.kpiGrid}>
       <div style={styles.kpiCard}>
         <div style={styles.kpiLabel}>Total productos registrados</div>
@@ -1052,9 +1051,9 @@ function ProduccionDocente({ uid, perfil }) {
           {perfilPredominante}
         </div>
       </div>
-
     </div>
-
+    
+    <div style={styles.sectionBlock}>
     <div style={styles.kpiGridExtended}>
       <div style={styles.kpiCard}>
         <div style={styles.kpiLabel}>NC</div>
@@ -1081,7 +1080,8 @@ function ProduccionDocente({ uid, perfil }) {
         <div style={styles.kpiValue}>{kpisPersonales.porCategoria.FRH}</div>
       </div>
     </div>
-
+      
+    <div style={styles.sectionBlock}>
       <Card title="Registrar nuevo proyecto">
 
         {err ? <div style={styles.inlineError}>{err}</div> : null}
@@ -1093,7 +1093,7 @@ function ProduccionDocente({ uid, perfil }) {
             <input
               value={nombreProyecto}
               onChange={(e)=>setNombreProyecto(e.target.value)}
-              style={styles.input}
+              style={{...styles.input, maxWidth: 340}}
               placeholder="Ej: Sistema inteligente para ..."
             />
           </div>
@@ -1104,7 +1104,7 @@ function ProduccionDocente({ uid, perfil }) {
               type="number"
               value={anioInicioProyecto}
               onChange={(e)=>setAnioInicioProyecto(e.target.value)}
-              style={styles.input}
+              style={{...styles.input, maxWidth: 90}}
             />
           </div>
 
@@ -1121,12 +1121,12 @@ function ProduccionDocente({ uid, perfil }) {
               </select>
             </div>
 
-            <div>
+            <div style={{ gridColumn: "span 2" }}>
               <div style={styles.label}>Línea de investigación</div>
               <select
                 value={lineaInvestigacion}
                 onChange={(e) => setLineaInvestigacion(e.target.value)}
-                style={styles.input}
+                style={{...styles.input, maxWidth: 250}}
               >
                 <option value="">Seleccionar</option>
                 {LINEAS_GRUPO.map((linea) => (
@@ -1154,13 +1154,15 @@ function ProduccionDocente({ uid, perfil }) {
             </button>
           </div>
       </Card>
+      </div>
 
+      <div style={styles.sectionBlock}>
       <Card title="Registrar nuevo producto">
         {err ? <div style={styles.inlineError}>{err}</div> : null}
         {msg ? <div style={styles.inlineOk}>{msg}</div> : null}
 
         <div style={styles.formGrid}>
-          <div>
+          <div style={{ gridColumn: "1 / 8", gridRow: "1" }}>
             <div style={styles.label}>Título</div>
             <input
               value={titulo}
@@ -1170,59 +1172,11 @@ function ProduccionDocente({ uid, perfil }) {
             />
           </div>
 
-          <div>
-            <div style={styles.label}>Tipo</div>
-            <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={styles.input}>
-              <option>Artículo</option>
-              <option>Ponencia</option>
-              <option>Capítulo de libro</option>
-              <option>Libro Investigación</option>
-              <option>Software</option>
-              <option>Proyecto</option>
-              <option>Prototipo</option>
-              <option>Otro</option>
-            </select>
-          </div>
-
-          <div>
-            <div style={styles.label}>Año</div>
-            <input
-              type="number"
-              value={anio}
-              onChange={(e) => setAnio(e.target.value)}
-              style={styles.input}
-            />
-          </div>
-
-          <div>
-            <div style={styles.label}>Estado</div>
-            <select value={estado} onChange={(e) => setEstado(e.target.value)} style={styles.input}>
-              <option>Borrador</option>
-              <option>Enviado</option>
-              <option>Aceptado</option>
-              <option>Registrado</option>
-              <option>Publicado</option>
-            </select>
-          </div>
-
-          <div>
-            <div style={styles.label}>Categoría MinCiencias</div>
-            <select value={categoria} onChange={(e) => setCategoria(e.target.value)} style={styles.input}>
-              <option>Nuevo Conocimiento</option>
-              <option>Desarrollo Tecnológico</option>
-              <option>Apropiación Social</option>
-              <option>Divulgación pública ciencia</option>
-              <option>Formación RRHH</option>
-            </select>
-          </div>
-
-          <div>
+          <div style={{ gridColumn: "1 / 8", gridRow: "2" }}>
             <div style={styles.label}>Proyecto asociado</div>
             <select
-              value={form.proyecto_asociado_id}
-              onChange={(e) =>
-                setForm({ ...form, proyecto_asociado_id: e.target.value })
-              }
+              value={proyectoAsociado}
+              onChange={(e) => setProyectoAsociado(e.target.value)}
               style={styles.input}
             >
               <option value="">Seleccionar proyecto</option>
@@ -1236,17 +1190,77 @@ function ProduccionDocente({ uid, perfil }) {
             </select>
           </div>
 
-          <div>
+          <div style={{ gridColumn: "1 / 2", gridRow: "3" }}>
+            <div style={styles.label}>Tipo</div>
+            <select 
+              value={tipo} 
+              onChange={(e) => setTipo(e.target.value)} 
+              style={styles.input}
+              >
+              <option>Artículo</option>
+              <option>Ponencia</option>
+              <option>Capítulo de libro</option>
+              <option>Libro Investigación</option>
+              <option>Software</option>
+              <option>Proyecto</option>
+              <option>Prototipo</option>
+              <option>Otro</option>
+            </select>
+          </div>
+
+          <div style={{ gridColumn: "2 / 3", gridRow: "3" }}>
+            <div style={styles.label}>Año</div>
+            <input
+              type="number"
+              value={anio}
+              onChange={(e) => setAnio(e.target.value)}
+              style={{...styles.input, maxWidth: 100}}
+            />
+          </div>
+
+          <div style={{ gridColumn: "3 / 4", gridRow: "3" }}>
+            <div style={styles.label}>Estado</div>
+            <select 
+              value={estado} 
+              onChange={(e) => setEstado(e.target.value)} 
+              style={styles.input}
+              >
+              <option>Borrador</option>
+              <option>Enviado</option>
+              <option>Aceptado</option>
+              <option>Registrado</option>
+              <option>Publicado</option>
+            </select>
+          </div>
+
+          <div style={{ gridColumn: "4 / 6", gridRow: "3" }}>
+            <div style={styles.label}>Categoría MinCiencias</div>
+            <select 
+              value={categoria} 
+              onChange={(e) => setCategoria(e.target.value)} 
+              style={styles.input}
+              >
+              <option>Nuevo Conocimiento</option>
+              <option>Desarrollo Tecnológico</option>
+              <option>Apropiación Social</option>
+              <option>Divulgación pública ciencia</option>
+              <option>Formación RRHH</option>
+            </select>
+          </div>
+
+          
+
+          <div style={{ gridColumn: "6 / 7", gridRow: "3" }}>
             <div style={styles.label}>DOI</div>
             <input
               value={doi}
               onChange={(e) => setDoi(e.target.value)}
-              style={styles.input}
+              style={{...styles.input, maxWidth: 150}}
               placeholder="10.xxxx/xxxxx"
             />
           </div>
 
-          <div>
+          <div style={{ gridColumn: "7 / 8", gridRow: "3" }}>
             <div style={styles.label}>ISBN</div>
             <input
               value={isbn}
@@ -1256,7 +1270,7 @@ function ProduccionDocente({ uid, perfil }) {
             />
           </div>
 
-          <div style={{ gridColumn: "1 / -1" }}>
+          <div style={{ gridColumn: "1 / 8", gridRow: "4" }}>
             <div style={styles.label}>URL (opcional)</div>
             <input
               value={url}
@@ -1273,16 +1287,22 @@ function ProduccionDocente({ uid, perfil }) {
           </button>
         </div>
       </Card>
-
+      </div>
+      
+      <div style={styles.sectionBlock}>
       <Card title="Mis proyectos">
         <ProyectosTable rows={misProyectos} />
       </Card>
+      </div>
 
+      <div style={styles.sectionBlock}>
       <Card title="Mis productos">
         <ProductosTable rows={rows} onChangeEstado={actualizarEstado} />
       </Card>
-    
-  </>
+      </div>
+      </div>
+    </div>
+  </div>
   );
 }
 
@@ -3085,8 +3105,7 @@ function ProductosTable({ rows, onChangeEstado }) {
             <th style={th}>Título</th>
             <th style={th}>Categoría</th>
             <th style={th}>Estado</th>
-             <th style={th}>DOI / ISBN</th>
-            <th style={th}>URL</th>
+             <th style={th}>Identificador</th>
           </tr>
         </thead>
         <tbody>
@@ -3094,13 +3113,26 @@ function ProductosTable({ rows, onChangeEstado }) {
             <tr key={p.id}>
               <td style={td}>{p.anio ?? "—"}</td>
               <td style={td}>{p.tipo_producto || p.tipo || "—"}</td>
-              <td style={td}>{p.titulo ?? "—"}</td>
+              <td style={td}>
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div>{p.titulo ?? "—"}</div>
+                  {p.url ? (
+                    <a href={p.url} target="_blank" rel="noreferrer" style={{
+                          ...styles.link,
+                          fontSize: 12,
+                          color: "#1B75BC"
+                        }}>
+                      Enlace
+                    </a>
+                  ) : null}
+                </div>
+              </td>
               <td style={td}>{p.categoria_minciencias_producto || "—"}</td>
               <td style={td}>
                 <select
                   value={p.estado_producto || p.estado || "Borrador"}
                   onChange={(e) => onChangeEstado(p.id, e.target.value)}
-                  style={{ ...styles.input, padding: "8px 10px" }}
+                  style={{ ...styles.input, padding: "8px 10px" , maxWidth: 250}}
                 >
                   <option>Borrador</option>
                   <option>Enviado</option>
@@ -3110,15 +3142,7 @@ function ProductosTable({ rows, onChangeEstado }) {
                 </select>
               </td>
               <td style={td}>{p.doi || p.isbn || "—"}</td>
-              <td style={td}>
-                {p.url ? (
-                  <a href={p.url} target="_blank" rel="noreferrer" style={styles.link}>
-                    Ver
-                  </a>
-                ) : (
-                  "—"
-                )}
-              </td>
+              
             </tr>
           ))}
         </tbody>
@@ -3291,6 +3315,11 @@ headerLogo: {
     boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
     minWidth: 0,
   },
+
+  sectionBlock: {
+    marginBottom: 28,
+  },
+
   cardTitle: { fontWeight: 900, color: UDI_BLUE_DARK, marginBottom: 12 },
 
   row: { display: "grid", gridTemplateColumns: "220px 1fr", gap: 10, padding: "8px 0" },

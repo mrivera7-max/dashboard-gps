@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, collection, onSnapshot } from "firebase/firestore";
 import IntegrantesAdminView from "./IntegrantesAdminView";
 import EstadoGeneralGrupo from "./components/EstadoGeneralGrupo";
 
@@ -9,6 +9,8 @@ import gpsLogo from "./assets/logo-gps.png";
 import udiLogo from "./assets/logo-udi.png";
 
 import { auth, db, functions } from "./firebaseConfig"; // ajusta ruta real
+
+import { generarInformeWordGrupo } from "./utils/generarInformeWordGrupo";
 
 const UDI_BLUE_DARK = "#1B75BC";
 const SYSTEM = {
@@ -28,6 +30,10 @@ export default function Dashboard({ logout }) {
   // Sesión (estado REAL de Firebase Auth)
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  const [investigadores, setInvestigadores] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [proyectos, setProyectos] = useState([]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -70,6 +76,56 @@ export default function Dashboard({ logout }) {
       (err) => {
         console.error(err);
         setKpiError(err?.message || "Error leyendo Indicadores");
+      }
+    );
+
+    
+
+    return () => unsub();
+    }, []);
+
+    useEffect(() => {
+    const ref = collection(db, "investigadores");
+
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        setInvestigadores(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      },
+      (err) => {
+        console.error("Error leyendo investigadores:", err);
+      }
+    );
+
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const ref = collection(db, "productos");
+
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        setProductos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      },
+      (err) => {
+        console.error("Error leyendo productos:", err);
+      }
+    );
+
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const ref = collection(db, "proyectos");
+
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        setProyectos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      },
+      (err) => {
+        console.error("Error leyendo proyectos:", err);
       }
     );
 
@@ -227,6 +283,24 @@ export default function Dashboard({ logout }) {
             >
               Recalcular Indicadores
             </button>
+
+             <button
+              onClick={() =>
+                generarInformeWordGrupo({
+                  kpis,
+                  investigadores: [],   // por ahora temporal
+                  productos: [],        // por ahora temporal
+                  proyectos: [],        // por ahora temporal
+                  nombreLiderGrupo: user?.displayName || user?.email || "—",
+                })
+              }
+              style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
+              disabled={authLoading}
+              title={authLoading ? "Cargando sesión…" : "Generar informe Word del grupo"}
+            >
+              Generar informe
+            </button>
+
             <div style={styles.msg}>{msg}</div>
           </div>
         ) : null}
