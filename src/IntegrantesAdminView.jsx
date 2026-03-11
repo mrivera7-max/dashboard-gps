@@ -88,6 +88,43 @@ const CAT_MINCIENCIAS_LABEL = {
   SC: "Sin categoría",
 };
 
+const estadoColor = {
+    "En proceso": {
+      background: "rgba(107,114,128,0.15)",
+      color: "#374151",
+      border: "1px solid rgba(107,114,128,0.35)"
+    },
+    "Sometido": {
+      background: "rgba(59,130,246,0.15)",
+      color: "#1E40AF",
+      border: "1px solid rgba(59,130,246,0.35)"
+    },
+    "Aprobado (Institucional)": {
+      background: "rgba(234,179,8,0.15)",
+      color: "#92400E",
+      border: "1px solid rgba(234,179,8,0.35)"
+    },
+    "Registrado": {
+      background: "rgba(168,85,247,0.15)",
+      color: "#6B21A8",
+      border: "1px solid rgba(168,85,247,0.35)"
+    },
+    "Publicado": {
+      background: "rgba(34,197,94,0.15)",
+      color: "#166534",
+      border: "1px solid rgba(34,197,94,0.35)"
+    }
+  };
+
+  const estadoBadge = {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontWeight: 900,
+    fontSize: 12
+  };
+
 const makeInvId = (docId) => {
   const clean = (docId || "").replace(/[^a-zA-Z0-9]/g, "");
   const tail = clean.slice(-6).toUpperCase();
@@ -593,18 +630,39 @@ useEffect(() => {
             {/* Proyectos */}
             <div style={sectionCard}>
               <h4 style={sectionTitle}>Proyectos</h4>
+
               {proyectos.length === 0 ? (
-                <div style={{ fontSize: 13, color: "#666" }}>
+                <div style={{ color: "#666" }}>
                   No se detectaron proyectos.
                 </div>
               ) : (
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {proyectos.map(pr => (
-                    <li key={pr.id}>
-                      <b>{getProyTitulo(pr)}</b> — {pr.anio_inicio || "—"}
-                    </li>
-                  ))}
-                </ul>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        <th style={th}>Año</th>
+                        <th style={th}>Acto administrativo</th>
+                        <th style={th}>Título</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {proyectos.map((pr) => (
+                        <tr key={pr.id}>
+                          <td style={td}>{pr.anio_inicio || "—"}</td>
+
+                          <td style={td}>
+                            {pr.acto_administrativo || "—"}
+                          </td>
+
+                          <td style={td}>
+                            {getProyTitulo(pr)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
@@ -619,7 +677,7 @@ useEffect(() => {
                     <thead>
                       <tr>
                         <th style={th}>Año</th>
-                        <th style={th}>Mes</th>
+                        <th style={th}>Estado</th>
                         <th style={th}>Tipo</th>
                         <th style={th}>Título</th>
                       </tr>
@@ -628,7 +686,16 @@ useEffect(() => {
                       {productos.map(p => (
                         <tr key={p.id}>
                           <td style={td}>{p.anio}</td>
-                          <td style={td}>{p.mes}</td>
+                          <td style={td}>
+                            <span
+                              style={{
+                                ...estadoBadge,
+                                ...(estadoColor[p.estado_producto] || estadoColor["En proceso"])
+                              }}
+                            >
+                              {p.estado_producto || "En proceso"}
+                            </span>
+                          </td>
                           <td style={td}>{p.tipo || p.tipo_producto || "Sin tipo"}</td>
                           <td style={td}>{p.titulo || p.nombre || "—"}</td>
                         </tr>

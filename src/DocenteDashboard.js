@@ -110,6 +110,100 @@ const AREAS_CONOCIMIENTO_MINCIENCIAS = [
     ],
   };
 
+  const ESTADOS_PRODUCTO = [
+    "En proceso",
+    "Sometido",
+    "Aprobado (Institucional)",
+    "Registrado",
+    "Publicado"
+  ];
+
+  const TIPOS_PRODUCTO_POR_CATEGORIA = {
+  "Nuevo Conocimiento": [
+    "Artículo A1 (OA)",
+    "Artículo D (OP)",
+    "Notas científicas A1",
+    "Libro Investigación A1",
+    "Libro Investigación C",
+    "Capítulo Libro A1",
+    "Capítulo Libro C",
+    "Libro Formación Q1",
+    "Patente Invención A1",
+    "Patente Modelo utilidad A1",
+    "Variedad Vegetal A1",
+    "Nuevas razas animales A",
+    "Poblaciones pecuarias B",
+    "Creación o investigación-creación A1",
+  ],
+
+  "Desarrollo Tecnológico": [
+    "Diseños industriales A",
+    "Esquemas de circuito integrado",
+    "Software",
+    "Plantas piloto",
+    "Prototipo industrial",
+    "Signos distintivos",
+    "Productos nutracéuticos",
+    "Colecciones científicas",
+    "Nuevos registros científicos",
+    "Secreto empresarial",
+    "Empresas de base tecnológica A",
+    "Empresas creativas y culturales A1",
+    "Innovaciones en procesos y servicios",
+    "Regulaciones y normas",
+    "Guías de práctica clínica",
+    "Guías de manejo clínico forense",
+    "Manuales de atención a víctimas",
+    "Protocolos de atención a usuarios",
+    "Protocolos de vigilancia epidemiológica",
+    "Acuerdo de Ley",
+    "Proyectos de Ley",
+    "Conceptos técnicos",
+    "Licencias de explotación",
+  ],
+
+  "Apropiación Social": [
+    "Solución a asuntos de interés social",
+    "Insumos de política pública y normatividad A",
+    "Fortalecimiento de cadenas productivas A",
+    "Trabajo conjunto centro-grupo de investigación A",
+  ],
+
+  "Divulgación pública ciencia": [
+    "Eventos científicos A",
+    "Participación en redes de conocimiento A",
+    "Talleres de creación",
+    "Eventos artísticos, de arquitectura o diseño A",
+    "Working papers",
+    "Nuevas secuencias genéticas",
+    "Ediciones de revista o libro de divulgación",
+    "Informes finales de investigación",
+    "Informes técnicos",
+    "Consultorías científico-tecnológicas",
+    "Publicaciones editoriales no especializadas A1",
+    "Producciones de contenido digital A1",
+    "Producción de estrategias transmedia A1",
+    "Desarrollos web A1",
+    "Libros de formación Q2",
+    "Boletines divulgativos",
+    "Libros de divulgación",
+    "Generación de contenido",
+    "Manuales y guías especializadas",
+  ],
+
+  "Formación RRHH": [
+    "Apoyo a creación Programas de Doctorado A",
+    "Apoyo a creación cursos Doctorado C",
+    "Proyectos de investigación y desarrollo A",
+    "Proyectos de investigación-creación A",
+    "Proyecto I+D+I con formación A",
+    "Proyectos de extensión",
+    "Acompañamiento Programa Ondas",
+    "Dirección Tesis Maestría",
+    "Dirección Tesis Doctorado",
+  ],
+};
+
 export default function DocenteDashboard({ logout }) {
   const role = useMemo(() => "docente", []);
   const [activeView, setActiveView] = useState("perfil"); // perfil | produccion | ficha | conexiones
@@ -585,9 +679,11 @@ function ProduccionDocente({ uid, perfil }) {
 
   // Form
   const [titulo, setTitulo] = useState("");
-  const [tipo, setTipo] = useState("Artículo");
+  const [tipo, setTipo] = useState(
+    TIPOS_PRODUCTO_POR_CATEGORIA["Nuevo Conocimiento"][0]
+  );
   const [anio, setAnio] = useState(new Date().getFullYear());
-  const [estado, setEstado] = useState("Borrador");
+  const [estado, setEstado] = useState("En proceso");
   const [url, setUrl] = useState("");
 
   const idInvestigador = (perfil?.id_investigador || "").toString().trim();
@@ -607,6 +703,8 @@ function ProduccionDocente({ uid, perfil }) {
     url: "",
     proyecto_asociado_id: "",
   });
+
+  const tiposDisponibles = TIPOS_PRODUCTO_POR_CATEGORIA[categoria] || [];
 
   // ====== Productos del docente ======
   useEffect(() => {
@@ -892,11 +990,11 @@ function ProduccionDocente({ uid, perfil }) {
       });
 
       setTitulo("");
-      setTipo("Artículo");
       setAnio(new Date().getFullYear());
       setEstado("Borrador");
       setUrl("");
       setCategoria("Nuevo Conocimiento");
+      setTipo(TIPOS_PRODUCTO_POR_CATEGORIA["Nuevo Conocimiento"][0]);
       setProyectoAsociado("");
       setDoi("");
       setIsbn("");
@@ -1190,54 +1288,17 @@ function ProduccionDocente({ uid, perfil }) {
             </select>
           </div>
 
-          <div style={{ gridColumn: "1 / 2", gridRow: "3" }}>
-            <div style={styles.label}>Tipo</div>
-            <select 
-              value={tipo} 
-              onChange={(e) => setTipo(e.target.value)} 
-              style={styles.input}
-              >
-              <option>Artículo</option>
-              <option>Ponencia</option>
-              <option>Capítulo de libro</option>
-              <option>Libro Investigación</option>
-              <option>Software</option>
-              <option>Proyecto</option>
-              <option>Prototipo</option>
-              <option>Otro</option>
-            </select>
-          </div>
-
-          <div style={{ gridColumn: "2 / 3", gridRow: "3" }}>
-            <div style={styles.label}>Año</div>
-            <input
-              type="number"
-              value={anio}
-              onChange={(e) => setAnio(e.target.value)}
-              style={{...styles.input, maxWidth: 100}}
-            />
-          </div>
-
-          <div style={{ gridColumn: "3 / 4", gridRow: "3" }}>
-            <div style={styles.label}>Estado</div>
-            <select 
-              value={estado} 
-              onChange={(e) => setEstado(e.target.value)} 
-              style={styles.input}
-              >
-              <option>Borrador</option>
-              <option>Enviado</option>
-              <option>Aceptado</option>
-              <option>Registrado</option>
-              <option>Publicado</option>
-            </select>
-          </div>
-
-          <div style={{ gridColumn: "4 / 6", gridRow: "3" }}>
+          <div style={{ gridColumn: "1 / 3", gridRow: "3" }}>
             <div style={styles.label}>Categoría MinCiencias</div>
             <select 
-              value={categoria} 
-              onChange={(e) => setCategoria(e.target.value)} 
+              value={categoria}
+              onChange={(e) => {
+                const nuevaCategoria = e.target.value;
+                setCategoria(nuevaCategoria);
+
+                const primerosTipos = TIPOS_PRODUCTO_POR_CATEGORIA[nuevaCategoria] || [];
+                setTipo(primerosTipos[0] || "");
+              }}
               style={styles.input}
               >
               <option>Nuevo Conocimiento</option>
@@ -1248,7 +1309,49 @@ function ProduccionDocente({ uid, perfil }) {
             </select>
           </div>
 
-          
+          <div style={{ gridColumn: "3 / 4", gridRow: "3" }}>
+            <div style={styles.label}>Tipo</div>
+            <select 
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              style={styles.input}
+            >
+              {tiposDisponibles.length === 0 ? (
+                <option value="">Sin tipos disponibles</option>
+              ) : (
+                tiposDisponibles.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          <div style={{ gridColumn: "4 / 5", gridRow: "3" }}>
+            <div style={styles.label}>Año</div>
+            <input
+              type="number"
+              value={anio}
+              onChange={(e) => setAnio(e.target.value)}
+              style={{...styles.input, maxWidth: 100}}
+            />
+          </div>
+
+          <div style={{ gridColumn: "5 / 6", gridRow: "3" }}>
+            <div style={styles.label}>Estado</div>
+            <select
+              value={estado}
+              onChange={(e) => setEstado(e.target.value)}
+              style={styles.input}
+            >
+              {ESTADOS_PRODUCTO.map((e) => (
+                <option key={e} value={e}>
+                  {e}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div style={{ gridColumn: "6 / 7", gridRow: "3" }}>
             <div style={styles.label}>DOI</div>
@@ -3090,6 +3193,43 @@ function ProyectosTable({ rows }) {
     );
   }
 
+const estadoColor = {
+  "En Proceso": {
+    background: "rgba(107,114,128,0.15)",
+    color: "#374151",
+    border: "1px solid rgba(107,114,128,0.35)"
+  },
+  "Sometido": {
+    background: "rgba(59,130,246,0.15)",
+    color: "#1E40AF",
+    border: "1px solid rgba(59,130,246,0.35)"
+  },
+  "Aprobado (Institucional)": {
+    background: "rgba(234,179,8,0.15)",
+    color: "#92400E",
+    border: "1px solid rgba(234,179,8,0.35)"
+  },
+  "Registrado": {
+    background: "rgba(168,85,247,0.15)",
+    color: "#6B21A8",
+    border: "1px solid rgba(168,85,247,0.35)"
+  },
+  "Publicado": {
+    background: "rgba(34,197,94,0.15)",
+    color: "#166534",
+    border: "1px solid rgba(34,197,94,0.35)"
+  }
+};
+
+const estadoBadge = {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "6px 10px",
+  borderRadius: 999,
+  fontWeight: 900,
+  fontSize: 12
+};
+
 function ProductosTable({ rows, onChangeEstado }) {
   if (!rows || rows.length === 0) {
     return <div style={{ color: "#4A5568", fontWeight: 700 }}>Sin registros todavía.</div>;
@@ -3129,17 +3269,31 @@ function ProductosTable({ rows, onChangeEstado }) {
               </td>
               <td style={td}>{p.categoria_minciencias_producto || "—"}</td>
               <td style={td}>
-                <select
-                  value={p.estado_producto || p.estado || "Borrador"}
-                  onChange={(e) => onChangeEstado(p.id, e.target.value)}
-                  style={{ ...styles.input, padding: "8px 10px" , maxWidth: 250}}
-                >
-                  <option>Borrador</option>
-                  <option>Enviado</option>
-                  <option>Aceptado</option>
-                  <option>Registrado</option>
-                  <option>Publicado</option>
-                </select>
+                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+  
+                  <span
+                    style={{
+                      ...estadoBadge,
+                      ...(estadoColor[p.estado_producto] || estadoColor["Borrador"])
+                    }}
+                  >
+                    {p.estado_producto || "Borrador"}
+                  </span>
+
+                  <select
+                    value={p.estado_producto || "En proceso"}
+                    onChange={(e) => onChangeEstado(p.id, e.target.value)}
+                    style={{ ...styles.input, padding: "8px 10px", maxWidth: 250 }}
+                  >
+                    {ESTADOS_PRODUCTO.map((e) => (
+                      <option key={e} value={e}>
+                        {e}
+                      </option>
+                    ))}
+                  </select>
+
+                </div>
+                  
               </td>
               <td style={td}>{p.doi || p.isbn || "—"}</td>
               
