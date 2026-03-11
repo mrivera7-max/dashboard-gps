@@ -258,7 +258,6 @@ useEffect(() => {
 
   let alive = true;
   const invIdNorm = String(selectedId).trim().toLowerCase(); // normalizado
-  
 
   const q = query(
     collection(db, "productos"),
@@ -323,6 +322,7 @@ useEffect(() => {
 }, [productos, proyectos]);
 
 // Cargar proyectos del investigador (investigador_principal == selectedId)
+// Cargar proyectos donde el investigador participa como principal o coinvestigador
 useEffect(() => {
   setProyectos([]);
   if (!selectedId) return;
@@ -332,7 +332,6 @@ useEffect(() => {
 
   const q = query(
     collection(db, "proyectos"),
-    where("investigador_principal", "==", invId),
     orderBy("anio_inicio", "desc")
   );
 
@@ -340,14 +339,73 @@ useEffect(() => {
     q,
     (snap) => {
       if (!alive) return;
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((p) => {
+          const esPrincipal =
+            String(p.investigador_principal || "").trim() === invId;
+
+          const coinvGrupo = Array.isArray(p.coinvestigadores_grupo_ids)
+            ? p.coinvestigadores_grupo_ids.map((x) => String(x).trim())
+            : [];
+
+          const esCoinvestigador = coinvGrupo.includes(invId);
+
+          return esPrincipal || esCoinvestigador;
+        });
+
       setProyectos(list);
     },
     (err) => console.error("[Proyectos] ERROR:", err)
   );
 
-  return () => { alive = false; unsub(); };
+  return () => {
+    alive = false;
+    unsub();
+  };
 }, [selectedId]);
+
+const proyectosDetalle = useMemo(() => {
+  if (!selectedId) return [];
+
+  const invId = String(selectedId).trim();
+
+  return proyectos.map((p) => {
+    const coinvGrupoIds = Array.isArray(p.coinvestigadores_grupo_ids)
+      ? p.coinvestigadores_grupo_ids.map((x) => String(x).trim())
+      : [];
+
+    const coinvExternos = Array.isArray(p.coinvestigadores_externos)
+      ? p.coinvestigadores_externos
+      : [];
+
+    const rol =
+      String(p.investigador_principal || "").trim() === invId
+        ? "IP"
+        : coinvGrupoIds.includes(invId)
+        ? "Coinvestigador"
+        : "—";
+
+    return {
+      ...p,
+      rol,
+      totalInternos: coinvGrupoIds.length,
+      totalExternos: coinvExternos.length,
+    };
+  });
+}, [proyectos, selectedId]);
+
+const resumenProyectos = useMemo(() => {
+  const comoIP = proyectosDetalle.filter((p) => p.rol === "IP").length;
+  const comoCoinv = proyectosDetalle.filter((p) => p.rol === "Coinvestigador").length;
+
+  return {
+    total: proyectosDetalle.length,
+    comoIP,
+    comoCoinv,
+  };
+}, [proyectosDetalle]);
 
     // 7) Analítica MinCiencias + tendencia (por investigador, filtrado por año)
   const analitica = useMemo(() => {
@@ -436,6 +494,30 @@ useEffect(() => {
 
     return { filas, cols, M, rowTotals, colTotals, grandTotal };
   }, [productos]);
+
+  const resumenProductos = useMemo(() => {
+  const r = {
+    total: productos.length,
+    NC: 0,
+    DT: 0,
+    ASC: 0,
+    DIV: 0,
+    FRH: 0,
+  };
+
+  productos.forEach((p) => {
+    const catRaw =
+      p.categoria_minciencias_producto ?? p.categoria_minciencias ?? "";
+
+    const cat = normProdCat(catRaw);
+    if (!cat) return;
+
+    const key = CAT_KEYS[cat];
+    if (key) r[key] += 1;
+  });
+
+  return r;
+}, [productos]);
 
   const isAdmin = true; // temporal mientras conectas roles reales
 
@@ -627,50 +709,83 @@ useEffect(() => {
               )}
             </div>
 
-            {/* Proyectos */}
-            <div style={sectionCard}>
-              <h4 style={sectionTitle}>Proyectos</h4>
+                {/* Proyectos */}
+                <div style={sectionCard}>
+                  <h4 style={sectionTitle}>Proyectos</h4>
 
-              {proyectos.length === 0 ? (
-                <div style={{ color: "#666" }}>
-                  No se detectaron proyectos.
+                  <div style={{ marginBottom: 10, color: "#4A5568", fontSize: 13 }}>
+                    <b>Total:</b> {resumenProyectos.total}{" "}
+                    | <b>Como IP:</b> {resumenProyectos.comoIP}{" "}
+                    | <b>Como coinvestigador:</b> {resumenProyectos.comoCoinv}
+                  </div>
+
+                  {proyectosDetalle.length === 0 ? (
+                    <div style={{ color: "#666" }}>
+                      No se detectaron proyectos.
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr>
+                            <th style={th}>Año</th>
+                            <th style={th}>Acto administrativo</th>
+                            <th style={th}>Título</th>
+                            <th style={th}>Rol</th>
+                            <th style={th}>Int. grupo</th>
+                            <th style={th}>Ext.</th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {proyectosDetalle.map((pr) => (
+                            <tr key={pr.id}>
+                              <td style={td}>{pr.anio_inicio || "—"}</td>
+
+                              <td style={td}>
+                                {pr.acto_administrativo || "—"}
+                              </td>
+
+                              <td style={td}>
+                                {getProyTitulo(pr)}
+                              </td>
+
+                              <td style={td}>
+                                <b>{pr.rol}</b>
+                              </td>
+
+                              <td style={td}>
+                                {pr.totalInternos}
+                              </td>
+
+                              <td style={td}>
+                                {pr.totalExternos}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr>
-                        <th style={th}>Año</th>
-                        <th style={th}>Acto administrativo</th>
-                        <th style={th}>Título</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {proyectos.map((pr) => (
-                        <tr key={pr.id}>
-                          <td style={td}>{pr.anio_inicio || "—"}</td>
-
-                          <td style={td}>
-                            {pr.acto_administrativo || "—"}
-                          </td>
-
-                          <td style={td}>
-                            {getProyTitulo(pr)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
 
             {/* Productos */}
             <div style={sectionCard}>
               <h4 style={sectionTitle}>Productos</h4>
+
+              <div style={{ marginBottom: 10, color: "#4A5568", fontSize: 13 }}>
+                <b>Total:</b> {resumenProductos.total}{" "}
+                | <b>NC:</b> {resumenProductos.NC}{" "}
+                | <b>DT:</b> {resumenProductos.DT}{" "}
+                | <b>ASC:</b> {resumenProductos.ASC}{" "}
+                | <b>DIV:</b> {resumenProductos.DIV}{" "}
+                | <b>FRH:</b> {resumenProductos.FRH}
+              </div>
+
               {productos.length === 0 ? (
-                <div style={{ color: "#666" }}>Sin productos para el investigador seleccionado.</div>
+                <div style={{ color: "#666" }}>
+                  Sin productos para el investigador seleccionado.
+                </div>
               ) : (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -683,7 +798,7 @@ useEffect(() => {
                       </tr>
                     </thead>
                     <tbody>
-                      {productos.map(p => (
+                      {productos.map((p) => (
                         <tr key={p.id}>
                           <td style={td}>{p.anio}</td>
                           <td style={td}>

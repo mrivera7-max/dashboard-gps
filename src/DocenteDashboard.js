@@ -696,6 +696,14 @@ function ProduccionDocente({ uid, perfil }) {
   const [descripcionProyecto, setDescripcionProyecto] = useState("");
   const [actoAdministrativo, setActoAdministrativo] = useState("");
 
+  const [integrantesGrupo, setIntegrantesGrupo] = useState([]);
+  const [coinvestigadorGrupoTemp, setCoinvestigadorGrupoTemp] = useState("");
+  const [coinvestigadoresGrupoIds, setCoinvestigadoresGrupoIds] = useState([]);
+
+  const [externoNombre, setExternoNombre] = useState("");
+  const [externoAfiliacion, setExternoAfiliacion] = useState("");
+  const [coinvestigadoresExternos, setCoinvestigadoresExternos] = useState([]);
+
   const [form, setForm] = useState({
     titulo: "",
     tipo_producto: "",
@@ -737,6 +745,35 @@ function ProduccionDocente({ uid, perfil }) {
 
     return () => unsub();
   }, [idInvestigadorNorm]);
+
+  useEffect(() => {
+    const qy = query(collection(db, "investigadores"));
+
+    const unsub = onSnapshot(
+      qy,
+      (snap) => {
+        const data = snap.docs
+          .map((d) => {
+            const obj = d.data();
+            return {
+              _docId: d.id,
+              ...obj,
+              id: (obj.id_investigador || d.id || "").toString().trim(),
+            };
+          })
+          .filter((inv) => inv.activo === true)
+          .sort((a, b) => (a.apellidos || "").localeCompare(b.apellidos || ""));
+
+        setIntegrantesGrupo(data);
+      },
+      (e) => {
+        console.error("[integrantesGrupo]", e);
+        setErr(e?.message || "Error leyendo integrantes del grupo");
+      }
+    );
+
+    return () => unsub();
+  }, []);
 
   // ====== Proyectos del docente ======
   useEffect(() => {
@@ -864,6 +901,56 @@ function ProduccionDocente({ uid, perfil }) {
     return `PROY-${String(nextNumber).padStart(3, "0")}`;
   };
 
+  const agregarCoinvestigadorGrupo = () => {
+  const id = String(coinvestigadorGrupoTemp || "").trim();
+  if (!id) return;
+
+  if (id === idInvestigador) {
+    setErr("No puedes agregarte como coinvestigador del grupo.");
+    return;
+  }
+
+  if (coinvestigadoresGrupoIds.includes(id)) {
+    setErr("Ese coinvestigador del grupo ya fue agregado.");
+    return;
+  }
+
+  setCoinvestigadoresGrupoIds((prev) => [...prev, id]);
+  setCoinvestigadorGrupoTemp("");
+  setErr("");
+};
+
+const quitarCoinvestigadorGrupo = (id) => {
+  setCoinvestigadoresGrupoIds((prev) => prev.filter((x) => x !== id));
+};
+
+const agregarCoinvestigadorExterno = () => {
+  const nombre = externoNombre.trim();
+  const afiliacion = externoAfiliacion.trim();
+
+  if (!nombre) {
+    setErr("El nombre del coinvestigador externo es obligatorio.");
+    return;
+  }
+
+  setCoinvestigadoresExternos((prev) => [
+    ...prev,
+    {
+      nombre,
+      afiliacion,
+      tipo: "externo",
+    },
+  ]);
+
+  setExternoNombre("");
+  setExternoAfiliacion("");
+  setErr("");
+};
+
+const quitarCoinvestigadorExterno = (index) => {
+  setCoinvestigadoresExternos((prev) => prev.filter((_, i) => i !== index));
+};
+
   const crearProyecto = async () => {
     try {
       setErr("");
@@ -902,6 +989,8 @@ function ProduccionDocente({ uid, perfil }) {
 
         investigador_principal: idInvestigador,
         investigador_principal_norm: idInvestigadorNorm,
+        coinvestigadores_grupo_ids: coinvestigadoresGrupoIds,
+        coinvestigadores_externos: coinvestigadoresExternos,
 
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -913,6 +1002,11 @@ function ProduccionDocente({ uid, perfil }) {
       setLineaInvestigacion("Robótica");
       setActoAdministrativo("");
       setDescripcionProyecto("");
+      setCoinvestigadorGrupoTemp("");
+      setCoinvestigadoresGrupoIds([]);
+      setExternoNombre("");
+      setExternoAfiliacion("");
+      setCoinvestigadoresExternos([]);
 
       setMsg(`Proyecto registrado ✅ Código asignado: ${codigoGenerado}`);
 
@@ -1185,14 +1279,132 @@ function ProduccionDocente({ uid, perfil }) {
         {msg ? <div style={styles.inlineOk}>{msg}</div> : null}
 
         <div style={styles.formGrid}>
-          <div style={{ gridColumn: "span 2" }}>
+          <div style={{ gridColumn: "1 / -1" }}>
             <div style={styles.label}>Nombre del proyecto</div>
             <input
               value={nombreProyecto}
-              onChange={(e)=>setNombreProyecto(e.target.value)}
-              style={{...styles.input, maxWidth: 330}}
+              onChange={(e) => setNombreProyecto(e.target.value)}
+              style={styles.input}
               placeholder="Ej: Sistema inteligente para ..."
             />
+          </div>
+
+          <div style={{ gridColumn: "1 / 5" }}>
+            <div style={styles.label}>Coinvestigador grupo</div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <select
+                value={coinvestigadorGrupoTemp}
+                onChange={(e) => setCoinvestigadorGrupoTemp(e.target.value)}
+                style={{ ...styles.input, flex: 1 }}
+              >
+                <option value="">Seleccione integrante</option>
+                {integrantesGrupo.map((inv) => (
+                  <option key={inv._docId} value={inv.id}>
+                    {(inv.apellidos || "").trim()} {(inv.nombres || "").trim()} ({inv.id})
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={agregarCoinvestigadorGrupo}
+                style={styles.secondaryBtn}
+              >
+                Agregar
+              </button>
+            </div>
+
+            {coinvestigadoresGrupoIds.length > 0 && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                {coinvestigadoresGrupoIds.map((id) => {
+                  const inv = integrantesGrupo.find((x) => x.id === id);
+                  const nombre = inv
+                    ? `${inv.apellidos || ""} ${inv.nombres || ""}`.trim()
+                    : id;
+
+                  return (
+                    <div
+                      key={id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "8px 10px",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        borderRadius: 10,
+                        background: "#F8FAFC",
+                      }}
+                    >
+                      <span>{nombre}</span>
+                      <button
+                        type="button"
+                        onClick={() => quitarCoinvestigadorGrupo(id)}
+                        style={styles.secondaryBtn}
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ gridColumn: "5 / 8" }}>
+            <div style={styles.label}>Coinvestigador externo</div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8 }}>
+              <input
+                value={externoNombre}
+                onChange={(e) => setExternoNombre(e.target.value)}
+                style={{...styles.input, maxWidth: 190}}
+                placeholder="Nombre"
+              />
+              <input
+                value={externoAfiliacion}
+                onChange={(e) => setExternoAfiliacion(e.target.value)}
+                style={{...styles.input, maxWidth: 190}}
+                placeholder="Afiliación"
+              />
+              <button
+                type="button"
+                onClick={agregarCoinvestigadorExterno}
+                style={styles.secondaryBtn}
+              >
+                Agregar
+              </button>
+            </div>
+
+            {coinvestigadoresExternos.length > 0 && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                {coinvestigadoresExternos.map((c, index) => (
+                  <div
+                    key={`${c.nombre}-${index}`}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 10px",
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      borderRadius: 10,
+                      background: "#F8FAFC",
+                    }}
+                  >
+                    <span>
+                      {c.nombre} {c.afiliacion ? `- ${c.afiliacion}` : ""}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => quitarCoinvestigadorExterno(index)}
+                      style={styles.secondaryBtn}
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ gridColumn: "span 1" }}>
@@ -1200,60 +1412,60 @@ function ProduccionDocente({ uid, perfil }) {
             <input
               type="number"
               value={anioInicioProyecto}
-              onChange={(e)=>setAnioInicioProyecto(e.target.value)}
-              style={{...styles.input, maxWidth: 90}}
+              onChange={(e) => setAnioInicioProyecto(e.target.value)}
+              style={{ ...styles.input, maxWidth: 90 }}
             />
           </div>
 
-            <div style={{ gridColumn: "span 1" }}>
-              <div style={styles.label}>Estado</div>
-              <select
-                value={estadoProyecto}
-                onChange={(e)=>setEstadoProyecto(e.target.value)}
-                style={styles.input}
-              >
-                <option>En ejecución</option>
-                <option>Finalizado</option>
-                <option>Formulación</option>
-              </select>
-            </div>
-
-            <div style={{ gridColumn: "span 1" }}>
-              <div style={styles.label}>Línea de investigación</div>
-              <select
-                value={lineaInvestigacion}
-                onChange={(e) => setLineaInvestigacion(e.target.value)}
-                style={{...styles.input, maxWidth: 250}}
-              >
-                <option value="">Seleccionar</option>
-                {LINEAS_GRUPO.map((linea) => (
-                  <option key={linea} value={linea}>
-                    {linea}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ gridColumn: "span 1" }}>
-              <div style={styles.label}>Acto administrativo</div>
-              <input
-                value={actoAdministrativo}
-                onChange={(e) => setActoAdministrativo(e.target.value)}
-                style={{ ...styles.input, maxWidth: 250 }}
-                placeholder="Ej: 2022-INV-XX-BGA"
-              />
-            </div>
-
-            <div style={{ gridColumn: "1 / -1" }}>
-              <div style={styles.label}>Descripción / tema</div>
-              <textarea
-                value={descripcionProyecto}
-                onChange={(e) => setDescripcionProyecto(e.target.value)}
-                style={styles.textarea}
-                placeholder="Describe brevemente el tema, propósito o enfoque del proyecto"
-              />
-            </div>
+          <div style={{ gridColumn: "span 2" }}>
+            <div style={styles.label}>Estado</div>
+            <select
+              value={estadoProyecto}
+              onChange={(e) => setEstadoProyecto(e.target.value)}
+              style={styles.input}
+            >
+              <option>En ejecución</option>
+              <option>Finalizado</option>
+              <option>Formulación</option>
+            </select>
           </div>
+
+          <div style={{ gridColumn: "span 2" }}>
+            <div style={styles.label}>Línea de investigación</div>
+            <select
+              value={lineaInvestigacion}
+              onChange={(e) => setLineaInvestigacion(e.target.value)}
+              style={styles.input}
+            >
+              <option value="">Seleccionar</option>
+              {LINEAS_GRUPO.map((linea) => (
+                <option key={linea} value={linea}>
+                  {linea}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ gridColumn: "span 2" }}>
+            <div style={styles.label}>Acto administrativo</div>
+            <input
+              value={actoAdministrativo}
+              onChange={(e) => setActoAdministrativo(e.target.value)}
+              style={styles.input}
+              placeholder="Ej: 2022-INV-XX-BGA"
+            />
+          </div>
+
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={styles.label}>Descripción / tema</div>
+            <textarea
+              value={descripcionProyecto}
+              onChange={(e) => setDescripcionProyecto(e.target.value)}
+              style={styles.textarea}
+              placeholder="Describe brevemente el tema, propósito o enfoque del proyecto"
+            />
+          </div>
+        </div>
 
           <div style={{marginTop:12}}>
             <button onClick={crearProyecto} style={styles.primaryBtn}>
@@ -3663,7 +3875,7 @@ kpiGridExtended: {
   gridTemplateColumns: "repeat(5, 1fr)",
   gap: 12,
   alignItems: "center",
-}
+},
 
 };
 
