@@ -694,6 +694,7 @@ function ProduccionDocente({ uid, perfil }) {
   const [estadoProyecto, setEstadoProyecto] = useState("En ejecución");
   const [lineaInvestigacion, setLineaInvestigacion] = useState("");
   const [descripcionProyecto, setDescripcionProyecto] = useState("");
+  const [actoAdministrativo, setActoAdministrativo] = useState("");
 
   const [form, setForm] = useState({
     titulo: "",
@@ -896,6 +897,7 @@ function ProduccionDocente({ uid, perfil }) {
         anio_inicio: y,
         estado_proyecto: estadoProyecto,
         linea_investigacion: lineaInvestigacion,
+        acto_administrativo: actoAdministrativo.trim() || null,
         descripcion_tema: descripcionProyecto.trim() || null,
 
         investigador_principal: idInvestigador,
@@ -909,6 +911,7 @@ function ProduccionDocente({ uid, perfil }) {
       setAnioInicioProyecto(new Date().getFullYear());
       setEstadoProyecto("En ejecución");
       setLineaInvestigacion("Robótica");
+      setActoAdministrativo("");
       setDescripcionProyecto("");
 
       setMsg(`Proyecto registrado ✅ Código asignado: ${codigoGenerado}`);
@@ -1096,10 +1099,6 @@ function ProduccionDocente({ uid, perfil }) {
     FRH: "Formación de Recurso Humano"
   };
 
-  
-
-  
-
   const perfilPredominante = nombresCategorias[codigoPerfil] || codigoPerfil;
 
   if (!idInvestigador) {
@@ -1186,17 +1185,17 @@ function ProduccionDocente({ uid, perfil }) {
         {msg ? <div style={styles.inlineOk}>{msg}</div> : null}
 
         <div style={styles.formGrid}>
-          <div style={{ gridColumn: "1 / span 2" }}>
+          <div style={{ gridColumn: "span 2" }}>
             <div style={styles.label}>Nombre del proyecto</div>
             <input
               value={nombreProyecto}
               onChange={(e)=>setNombreProyecto(e.target.value)}
-              style={{...styles.input, maxWidth: 340}}
+              style={{...styles.input, maxWidth: 330}}
               placeholder="Ej: Sistema inteligente para ..."
             />
           </div>
 
-          <div>
+          <div style={{ gridColumn: "span 1" }}>
             <div style={styles.label}>Año inicio</div>
             <input
               type="number"
@@ -1206,7 +1205,7 @@ function ProduccionDocente({ uid, perfil }) {
             />
           </div>
 
-            <div>
+            <div style={{ gridColumn: "span 1" }}>
               <div style={styles.label}>Estado</div>
               <select
                 value={estadoProyecto}
@@ -1219,7 +1218,7 @@ function ProduccionDocente({ uid, perfil }) {
               </select>
             </div>
 
-            <div style={{ gridColumn: "span 2" }}>
+            <div style={{ gridColumn: "span 1" }}>
               <div style={styles.label}>Línea de investigación</div>
               <select
                 value={lineaInvestigacion}
@@ -1233,6 +1232,16 @@ function ProduccionDocente({ uid, perfil }) {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div style={{ gridColumn: "span 1" }}>
+              <div style={styles.label}>Acto administrativo</div>
+              <input
+                value={actoAdministrativo}
+                onChange={(e) => setActoAdministrativo(e.target.value)}
+                style={{ ...styles.input, maxWidth: 250 }}
+                placeholder="Ej: 2022-INV-XX-BGA"
+              />
             </div>
 
             <div style={{ gridColumn: "1 / -1" }}>
