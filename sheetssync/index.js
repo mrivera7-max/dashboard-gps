@@ -328,7 +328,7 @@ const proyectosRes = await syncTabToCollection({
     anio_inicio: Number(obj["anio_inicio"] || obj["año_de_inicio"] || 0),
     estado_proyecto: (obj["estado_proyecto"] || obj["estado"] || "N/A").toString().trim(),
     linea_investigacion: linea || "N/A",
-    acto_administrativo: (obj["acto_administrativo"] || "").toString().trim(),
+    acto_administrativo: (obj["acto_administrativo"] || "").toString().trim() || null,
     investigador_principal: obj["investigador_principal"] || null,
     synced_at: admin.firestore.FieldValue.serverTimestamp(),
   };
