@@ -182,7 +182,7 @@ export default function App() {
           <div style={styles.terms}>
             Al continuar, acepta nuestros términos y condiciones
           </div>
-          <div style={styles.loginFooter}>Diseñado por: {SYSTEM.author}</div>
+          <div style={styles.loginFooter}>Diseñado por: {SYSTEM.author}. 2026</div>
         </div>
       </div>
     </div>
