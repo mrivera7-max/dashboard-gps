@@ -5,6 +5,8 @@ import { doc, collection, onSnapshot } from "firebase/firestore";
 import IntegrantesAdminView from "./IntegrantesAdminView";
 import EstadoGeneralGrupo from "./components/EstadoGeneralGrupo";
 
+import SemillerosView from "./SemillerosView";
+
 import gpsLogo from "./assets/logo-gps.png";
 import udiLogo from "./assets/logo-udi.png";
 
@@ -236,6 +238,11 @@ export default function Dashboard({ logout }) {
             active={activeView === "docentes"}
             onClick={() => setActiveView("docentes")}
           />
+          <NavBtn
+            text="Semilleros"
+            active={activeView === "semilleros"}
+            onClick={() => setActiveView("semilleros")}
+          />
         </div>
       </div>
 
@@ -311,6 +318,8 @@ export default function Dashboard({ logout }) {
           <EstadoGeneralGrupo refreshKey={estadoRefresh} />
         ) : activeView === "docentes" ? (
           <IntegrantesAdminView refreshKey={estadoRefresh} />
+        ) : activeView === "semilleros" ? (
+          <SemillerosView />
         ) : null}
       </div>
     </main>

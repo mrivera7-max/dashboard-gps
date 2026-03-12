@@ -3,6 +3,7 @@ import gpsLogo from "./assets/logo-gps.png";
 import udiLogo from "./assets/logo-udi.png";
 import { auth, db } from "./firebaseConfig";
 import { generarWordFicha } from "./utils/generarWordFicha";
+import SemillerosDocenteView from "./SemillerosDocenteView";
 
 
 
@@ -218,6 +219,9 @@ export default function DocenteDashboard({ logout }) {
   const [perfil, setPerfil] = useState(null);
   const [perfilErr, setPerfilErr] = useState("");
 
+  const [misSemilleros, setMisSemilleros] = useState([]);
+  // perfil | produccion | ficha | conexiones | semilleros
+
   useEffect(() => {
     if (!uid) return;
 
@@ -359,6 +363,38 @@ export default function DocenteDashboard({ logout }) {
   return () => unsub();
 }, [uid]);
 
+useEffect(() => {
+  const idInv = (perfil?.id_investigador || "").toString().trim();
+  if (!idInv) {
+    setMisSemilleros([]);
+    return;
+  }
+
+  const unsub = onSnapshot(
+    collection(db, "semilleros"),
+    (snap) => {
+      const data = snap.docs
+        .map((d) => ({ _docId: d.id, ...d.data() }))
+        .filter((s) => {
+          const esResponsable =
+            String(s.docente_responsable_id || "").trim() === idInv;
+
+          const esLider =
+            String(s.lider_grupo_id || "").trim() === idInv;
+
+          return esResponsable || esLider;
+        });
+
+      setMisSemilleros(data);
+    },
+    (e) => {
+      console.error("[misSemilleros]", e);
+    }
+  );
+
+  return () => unsub();
+}, [perfil?.id_investigador]);
+
   return (
     <div style={styles.page}>
       {/* SIDEBAR */}
@@ -400,8 +436,18 @@ export default function DocenteDashboard({ logout }) {
               active={activeView === "conexiones"}
               onClick={() => setActiveView("conexiones")}
             />
+            {misSemilleros.length > 0 && (
+              <NavBtn
+                text="Semilleros"
+                active={activeView === "semilleros"}
+                onClick={() => setActiveView("semilleros")}
+              />
+            )}
+
           </div>
         </div>
+
+        
 
        <div style={styles.sideBottom}>
           <button onClick={logout} style={styles.logoutBtn}>
@@ -450,9 +496,11 @@ export default function DocenteDashboard({ logout }) {
             <ProduccionDocente uid={uid} perfil={perfil} />
           ) : activeView === "ficha" ? (
             <FichaDesafioDocente uid={uid} perfil={perfil} />
-          ) : (
+          ) : activeView === "conexiones" ? (
             <ConexionesDocente perfil={perfil} />
-          )}
+          ) : activeView === "semilleros" ? (
+            <SemillerosDocenteView semilleros={misSemilleros} />
+          ) : null}
         </section>
       </main>
     </div>
@@ -675,6 +723,7 @@ function ProduccionDocente({ uid, perfil }) {
   const [proyectoAsociado, setProyectoAsociado] = useState("");
   const [doi, setDoi] = useState("");
   const [isbn, setIsbn] = useState("");
+  const [numeroRegistro, setNumeroRegistro] = useState("");
   const [misProyectos, setMisProyectos] = useState([]);
 
   // Form
@@ -1059,8 +1108,15 @@ const quitarCoinvestigadorExterno = (index) => {
         return setErr("Debes seleccionar una categoría MinCiencias.");
       }
 
-      if (doi.trim() && isbn.trim()) {
-        return setErr("Usa DOI o ISBN según corresponda, no ambos a la vez.");
+      const identificadoresDiligenciados = [
+        doi.trim(),
+        isbn.trim(),
+        numeroRegistro.trim(),
+        url.trim(),
+      ].filter(Boolean).length;
+
+      if (identificadoresDiligenciados === 0) {
+        return setErr("Debes registrar al menos un identificador: DOI, ISBN, número de registro o URL.");
       }
 
       if (!Number.isFinite(y) || y < 2000 || y > thisYear + 1) {
@@ -1081,6 +1137,7 @@ const quitarCoinvestigadorExterno = (index) => {
 
         doi: doi.trim() || null,
         isbn: isbn.trim() || null,
+        numero_registro: numeroRegistro.trim() || null,
         url: url.trim() || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1095,6 +1152,7 @@ const quitarCoinvestigadorExterno = (index) => {
       setProyectoAsociado("");
       setDoi("");
       setIsbn("");
+      setNumeroRegistro("");
       setMsg("Producto registrado ✅");
     } catch (e) {
       console.error(e);
@@ -1594,7 +1652,17 @@ const quitarCoinvestigadorExterno = (index) => {
             />
           </div>
 
-          <div style={{ gridColumn: "1 / 8", gridRow: "4" }}>
+          <div style={{ gridColumn: "1 / 4", gridRow: "4" }}>
+            <div style={styles.label}>Número de registro</div>
+            <input
+              value={numeroRegistro}
+              onChange={(e) => setNumeroRegistro(e.target.value)}
+              style={{...styles.input, maxWidth: 400}}
+              placeholder="Ej: REG-2025-014 / RAD-12345"
+            />
+          </div>
+
+          <div style={{ gridColumn: "4 / 8", gridRow: "4" }}>
             <div style={styles.label}>URL (opcional)</div>
             <input
               value={url}
@@ -3516,7 +3584,7 @@ function ProductosTable({ rows, onChangeEstado }) {
                 </div>
                   
               </td>
-              <td style={td}>{p.doi || p.isbn || "—"}</td>
+              <td style={td}>{p.doi || p.isbn || p.numero_registro || p.url || "—"}</td>
               
             </tr>
           ))}

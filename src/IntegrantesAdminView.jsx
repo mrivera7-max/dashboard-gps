@@ -195,6 +195,12 @@ export default function IntegrantesAdminView() {
   const [selectedDocId, setSelectedDocId] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [liderDocId, setLiderDocId] = useState(null);
+
+  const [semilleroZion, setSemilleroZion] = useState(null);
+  const [docenteSemilleroId, setDocenteSemilleroId] = useState("");
+  const [semilleroMsg, setSemilleroMsg] = useState("");
+  const [semilleroErr, setSemilleroErr] = useState("");
+  const [savingSemillero, setSavingSemillero] = useState(false);
   
   // cambiar de lider
   useEffect(() => {
@@ -250,6 +256,31 @@ export default function IntegrantesAdminView() {
     const inv = integrantes.find(x => x.id === selectedId) || null;
     setSelectedIntegrante(inv);
   }, [integrantes, selectedId]);
+
+  useEffect(() => {
+    const ref = doc(db, "semilleros", "ZION");
+
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        if (!snap.exists()) {
+          setSemilleroZion(null);
+          setDocenteSemilleroId("");
+          return;
+        }
+
+        const data = snap.data();
+        setSemilleroZion(data);
+        setDocenteSemilleroId(data.docente_responsable_id || "");
+      },
+      (err) => {
+        console.error("[Semillero ZION] ERROR:", err);
+        setSemilleroErr("Error leyendo el semillero ZION.");
+      }
+    );
+
+    return () => unsub();
+  }, []);
 
 // 2) Cargar productos del integrante seleccionado (por id_investigador = selectedId)
 useEffect(() => {
@@ -533,6 +564,43 @@ const resumenProyectos = useMemo(() => {
     });
   };
 
+  const guardarDocenteResponsableSemillero = async () => {
+    try {
+      setSemilleroErr("");
+      setSemilleroMsg("");
+
+      const id = String(docenteSemilleroId || "").trim();
+      if (!id) {
+        setSemilleroErr("Debes seleccionar un docente responsable.");
+        return;
+      }
+
+      const inv = integrantes.find((x) => String(x.id).trim() === id);
+      if (!inv) {
+        setSemilleroErr("No se encontró el investigador seleccionado.");
+        return;
+      }
+
+      const nombreCompleto =
+        `${inv.nombres || ""} ${inv.apellidos || ""}`.trim() || id;
+
+      setSavingSemillero(true);
+
+      await updateDoc(doc(db, "semilleros", "ZION"), {
+        docente_responsable_id: id,
+        docente_responsable_nombre: nombreCompleto,
+        updatedAt: serverTimestamp(),
+      });
+
+      setSemilleroMsg("Docente responsable asignado correctamente.");
+    } catch (e) {
+      console.error(e);
+      setSemilleroErr("Error guardando el docente responsable del semillero.");
+    } finally {
+      setSavingSemillero(false);
+    }
+  };
+
   
   // UI mínima (ajústala a tu estilo)
   return (
@@ -769,6 +837,85 @@ const resumenProyectos = useMemo(() => {
                   )}
                 </div>
 
+            {/* Semillero ZION */}
+            <div style={sectionCard}>
+              <h4 style={sectionTitle}>Semillero ZION</h4>
+
+              {semilleroErr ? (
+                <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>
+                  {semilleroErr}
+                </div>
+              ) : null}
+
+              {semilleroMsg ? (
+                <div style={{ color: "#166534", fontWeight: 800, marginBottom: 8 }}>
+                  {semilleroMsg}
+                </div>
+              ) : null}
+
+              <div style={{ display: "grid", gap: 10 }}>
+                <div>
+                  <b>Nombre:</b> {semilleroZion?.nombre || "Semillero ZION"}
+                </div>
+
+                <div>
+                  <b>Estado:</b> {semilleroZion?.estado || "—"}
+                </div>
+
+                <div>
+                  <b>Docente responsable actual:</b>{" "}
+                  {semilleroZion?.docente_responsable_nombre || "No asignado"}
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 900, color: "#374151", marginBottom: 6 }}>
+                    Seleccionar docente responsable
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <select
+                      value={docenteSemilleroId}
+                      onChange={(e) => setDocenteSemilleroId(e.target.value)}
+                      style={{
+                        minWidth: 320,
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: "1px solid rgba(45,156,219,0.30)",
+                        outline: "none",
+                        fontWeight: 700,
+                      }}
+                    >
+                      <option value="">-- Selecciona un docente --</option>
+                      {integrantes
+                        .filter((inv) => !!inv.activo)
+                        .map((inv) => (
+                          <option key={inv._docId} value={inv.id}>
+                            {(inv.apellidos || "").trim()} {(inv.nombres || "").trim()} ({inv.id})
+                          </option>
+                        ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={guardarDocenteResponsableSemillero}
+                      disabled={savingSemillero}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(45,156,219,0.35)",
+                        background: "rgba(27,117,188,0.08)",
+                        fontWeight: 900,
+                        cursor: savingSemillero ? "not-allowed" : "pointer",
+                        opacity: savingSemillero ? 0.7 : 1,
+                      }}
+                    >
+                      {savingSemillero ? "Guardando..." : "Asignar docente"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>    
+
             {/* Productos */}
             <div style={sectionCard}>
               <h4 style={sectionTitle}>Productos</h4>
@@ -795,6 +942,7 @@ const resumenProyectos = useMemo(() => {
                         <th style={th}>Estado</th>
                         <th style={th}>Tipo</th>
                         <th style={th}>Título</th>
+                        <th style={th}>Identificador</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -813,6 +961,7 @@ const resumenProyectos = useMemo(() => {
                           </td>
                           <td style={td}>{p.tipo || p.tipo_producto || "Sin tipo"}</td>
                           <td style={td}>{p.titulo || p.nombre || "—"}</td>
+                          <td style={td}>{p.doi || p.isbn || p.numero_registro || p.url || "—"}</td>
                         </tr>
                       ))}
                     </tbody>
