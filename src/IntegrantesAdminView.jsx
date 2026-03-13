@@ -853,6 +853,9 @@ const resumenProyectos = useMemo(() => {
                 </div>
               ) : null}
 
+
+              
+
               <div style={{ display: "grid", gap: 10 }}>
                 <div>
                   <b>Nombre:</b> {semilleroZion?.nombre || "Semillero ZION"}

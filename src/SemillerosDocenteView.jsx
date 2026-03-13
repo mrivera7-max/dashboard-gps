@@ -896,13 +896,33 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
               {selectedSemillero.nombre || "Semillero"}
             </h3>
 
-            <div style={{ display: "grid", gap: 8 }}>
-              <div><b>ID:</b> {selectedSemillero.id_semillero || "—"}</div>
-              <div><b>Estado:</b> {selectedSemillero.estado || "—"}</div>
-              <div><b>Línea principal:</b> {selectedSemillero.linea_principal || "—"}</div>
-              <div><b>Docente responsable:</b> {selectedSemillero.docente_responsable_nombre || "—"}</div>
-              <div><b>Descripción:</b> {selectedSemillero.descripcion || "—"}</div>
-            </div>
+            <div style={{ display: "flex", gap: 20, alignItems: "center", marginBottom: 12 }}>
+
+                {selectedSemillero.logo_url && (
+                    <img
+                    src={selectedSemillero.logo_url}
+                    alt="Logo semillero"
+                    style={{
+                        width: 90,
+                        height: 90,
+                        objectFit: "contain",
+                        borderRadius: 12,
+                        border: "1px solid rgba(45,156,219,0.25)",
+                        padding: 6,
+                        background: "white",
+                    }}
+                    />
+                )}
+
+                <div style={{ display: "grid", gap: 6 }}>
+                    <div><b>ID:</b> {selectedSemillero.id_semillero || "—"}</div>
+                    <div><b>Estado:</b> {selectedSemillero.estado || "—"}</div>
+                    <div><b>Línea principal:</b> {selectedSemillero.linea_principal || "—"}</div>
+                    <div><b>Docente responsable:</b> {selectedSemillero.docente_responsable_nombre || "—"}</div>
+                    <div><b>Descripción:</b> {selectedSemillero.descripcion || "—"}</div>
+                </div>
+
+                </div>
 
             <div>
                 <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(45,156,219,0.18)" }}>

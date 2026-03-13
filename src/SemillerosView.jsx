@@ -340,6 +340,8 @@ export default function SemillerosView() {
               {selectedSemillero.nombre || "Semillero"}
             </h3>
 
+            
+
             <div style={{ display: "grid", gap: 8 }}>
               <div><b>ID:</b> {selectedSemillero.id_semillero || "—"}</div>
               <div><b>Estado:</b> {selectedSemillero.estado || "—"}</div>
