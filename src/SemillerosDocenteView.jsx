@@ -9,10 +9,12 @@ import {
   updateDoc,
   getDocs,
   query,
-  where
+  where,
+  writeBatch,
 } from "firebase/firestore";
 
 import { db } from "./firebaseConfig";
+import * as XLSX from "xlsx";
 
 const cardStyle = {
   border: "1px solid rgba(45,156,219,0.25)",
@@ -80,6 +82,9 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
 
     const [proyectoErr, setProyectoErr] = useState("");
     const [proyectoMsg, setProyectoMsg] = useState("");
+
+    const [excelRows, setExcelRows] = useState([]);
+    const [showExcelPreview, setShowExcelPreview] = useState(false);
 
     const [nuevoProyecto, setNuevoProyecto] = useState({
     titulo: "",
@@ -301,6 +306,136 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
     }
     };
 
+    const handleExcelSemilleristas = async (e) => {
+        try {
+            setEstudianteErr("");
+            setEstudianteMsg("");
+
+            const file = e.target.files?.[0];
+            if (!file) return;
+
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data, { type: "array" });
+
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+
+            const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+            if (!rows.length) {
+            setEstudianteErr("El archivo Excel está vacío.");
+            return;
+            }
+
+            const normalizadas = rows.map((r) => ({
+            cedula: String(r.cedula || r.Cedula || r.cédula || r.Cédula || "").trim(),
+            nombre: String(r.nombre || r.Nombre || "").trim(),
+            programa: String(r.programa || r.Programa || "").trim(),
+            semestre: Number(r.semestre || r.Semestre || 0),
+            correo: String(r.correo || r.Correo || "").trim(),
+            telefono: String(r.telefono || r.Telefono || r.teléfono || r.Teléfono || "").trim(),
+            estado: String(r.estado || r.Estado || "activo").trim().toLowerCase() === "inactivo"
+                ? "inactivo"
+                : "activo",
+            anio_ingreso: Number(r.anio_ingreso || r.año_ingreso || r.Anio_ingreso || r.Año_ingreso || new Date().getFullYear()),
+            }));
+
+            const validas = normalizadas.filter((r) => r.nombre && r.cedula);
+
+            if (!validas.length) {
+            setEstudianteErr("No se encontraron filas válidas. Debe existir al menos nombre y cédula.");
+            return;
+            }
+
+            setExcelRows(validas);
+            setShowExcelPreview(true);
+        } catch (err) {
+            console.error(err);
+            setEstudianteErr("Error leyendo el archivo Excel.");
+        }
+        };
+
+    const guardarExcelSemilleristas = async () => {
+        try {
+            setEstudianteErr("");
+            setEstudianteMsg("");
+
+            if (!selectedSemillero?.id_semillero) {
+            setEstudianteErr("Debes seleccionar un semillero.");
+            return;
+            }
+
+            if (!excelRows.length) {
+            setEstudianteErr("No hay datos cargados desde Excel.");
+            return;
+            }
+
+            const q = query(
+            collection(db, "semilleristas"),
+            where("semillero_id", "==", selectedSemillero.id_semillero)
+            );
+
+            const snap = await getDocs(q);
+
+            let max = 0;
+            const cedulasExistentes = new Set();
+
+            snap.docs.forEach((d) => {
+            const data = d.data();
+
+            const id = data.id_semillerista || "";
+            const num = parseInt(String(id).replace("SEM-", ""), 10);
+            if (!isNaN(num) && num > max) max = num;
+
+            const ced = String(data.cedula || "").trim();
+            if (ced) cedulasExistentes.add(ced);
+            });
+
+            const batch = writeBatch(db);
+            let consecutivo = max;
+            let agregados = 0;
+
+            for (const row of excelRows) {
+            const ced = String(row.cedula || "").trim();
+            if (!ced || cedulasExistentes.has(ced)) continue;
+
+            consecutivo += 1;
+            const idSem = "SEM-" + String(consecutivo).padStart(3, "0");
+
+            const ref = doc(collection(db, "semilleristas"));
+
+            batch.set(ref, {
+                id_semillerista: idSem,
+                nombre: row.nombre,
+                cedula: ced,
+                programa: row.programa || "",
+                semestre: Number(row.semestre) || 0,
+                correo: row.correo || "",
+                telefono: row.telefono || "",
+                estado: row.estado || "activo",
+                anio_ingreso: Number(row.anio_ingreso) || new Date().getFullYear(),
+                semillero_id: selectedSemillero.id_semillero,
+                semillero_nombre: selectedSemillero.nombre || "",
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
+
+            cedulasExistentes.add(ced);
+            agregados += 1;
+            }
+
+            await batch.commit();
+
+            setExcelRows([]);
+            setShowExcelPreview(false);
+            setEstudianteMsg(`Carga masiva completada. Estudiantes agregados: ${agregados}`);
+        } catch (err) {
+            console.error(err);
+            setEstudianteErr("Error guardando estudiantes desde Excel.");
+        }
+        };
+
+
     {/* Proyectos */}
     useEffect(() => {
         if (!selectedSemillero?.id_semillero) {
@@ -362,7 +497,23 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
                 return;
                 }
 
-                const idProyecto = "PS-" + Date.now().toString().slice(-5);
+                const q = query(
+                    collection(db, "semillero_proyectos"),
+                    where("semillero_id", "==", selectedSemillero.id_semillero)
+                    );
+
+                    const snap = await getDocs(q);
+
+                    let max = 0;
+
+                    snap.docs.forEach((d) => {
+                    const id = d.data().id_proyecto_semillero || "";
+                    const num = parseInt(id.replace("PS-", ""), 10);
+                    if (!isNaN(num) && num > max) max = num;
+                    });
+
+                    const next = max + 1;
+                    const idProyecto = "PS-" + String(next).padStart(3, "0");
 
                 await addDoc(collection(db, "semillero_proyectos"), {
                 ...nuevoProyecto,
@@ -501,7 +652,23 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
         return;
         }
 
-        const idProducto = "PRS-" + Date.now().toString().slice(-5);
+        const q = query(
+            collection(db, "semillero_productos"),
+            where("semillero_id", "==", selectedSemillero.id_semillero)
+            );
+
+            const snap = await getDocs(q);
+
+            let max = 0;
+
+            snap.docs.forEach((d) => {
+            const id = d.data().id_producto_semillero || "";
+            const num = parseInt(id.replace("PRS-", ""), 10);
+            if (!isNaN(num) && num > max) max = num;
+            });
+
+            const next = max + 1;
+            const idProducto = "PRS-" + String(next).padStart(3, "0");
 
         await addDoc(collection(db, "semillero_productos"), {
         ...nuevoProducto,
@@ -608,7 +775,23 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
         return;
         }
 
-        const idActividad = "ACT-" + Date.now().toString().slice(-5);
+        const q = query(
+            collection(db, "semillero_actividades"),
+            where("semillero_id", "==", selectedSemillero.id_semillero)
+        );
+
+            const snap = await getDocs(q);
+
+            let max = 0;
+
+            snap.docs.forEach((d) => {
+            const id = d.data().id_actividad_semillero || "";
+            const num = parseInt(id.replace("ACT-", ""), 10);
+            if (!isNaN(num) && num > max) max = num;
+            });
+
+            const next = max + 1;
+            const idActividad = "ACT-" + String(next).padStart(3, "0");
 
         await addDoc(collection(db, "semillero_actividades"), {
         ...nuevaActividad,
@@ -853,15 +1036,98 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
                             </div>
                         ) : null}
 
-                        <div style={{ marginTop: 14 }}>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
                             <button
-                            type="button"
-                            onClick={() => setShowNuevoEstudiante((s) => !s)}
-                            style={btnPrimary}
+                                type="button"
+                                onClick={() => setShowNuevoEstudiante((s) => !s)}
+                                style={btnPrimary}
                             >
-                            {showNuevoEstudiante ? "Ocultar formulario" : "Nuevo estudiante"}
+                                {showNuevoEstudiante ? "Ocultar formulario" : "Nuevo estudiante"}
                             </button>
+
+                            <label
+                                style={{
+                                ...btnPrimary,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                }}
+                            >
+                                Cargar Excel
+                                <input
+                                type="file"
+                                accept=".xlsx,.xls"
+                                onChange={handleExcelSemilleristas}
+                                style={{ display: "none" }}
+                                />
+                            </label>
                         </div>
+
+                        {showExcelPreview && (
+                            <div
+                                style={{
+                                marginTop: 14,
+                                padding: 12,
+                                borderRadius: 12,
+                                border: "1px solid rgba(45,156,219,0.22)",
+                                background: "rgba(45,156,219,0.04)",
+                                }}
+                            >
+                                <div style={{ fontWeight: 900, color: "#1B75BC", marginBottom: 10 }}>
+                                Vista previa del Excel
+                                </div>
+
+                                <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                    <thead>
+                                    <tr>
+                                        <th style={thStyle}>Cédula</th>
+                                        <th style={thStyle}>Nombre</th>
+                                        <th style={thStyle}>Programa</th>
+                                        <th style={thStyle}>Semestre</th>
+                                        <th style={thStyle}>Estado</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {excelRows.map((r, i) => (
+                                        <tr key={i}>
+                                        <td style={tdStyle}>{r.cedula || "—"}</td>
+                                        <td style={tdStyle}>{r.nombre || "—"}</td>
+                                        <td style={tdStyle}>{r.programa || "—"}</td>
+                                        <td style={tdStyle}>{r.semestre || "—"}</td>
+                                        <td style={tdStyle}>{r.estado || "—"}</td>
+                                        </tr>
+                                    ))}
+                                    </tbody>
+                                </table>
+                                </div>
+
+                                <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+                                <button type="button" onClick={guardarExcelSemilleristas} style={btnPrimary}>
+                                    Guardar Excel
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                    setExcelRows([]);
+                                    setShowExcelPreview(false);
+                                    }}
+                                    style={{
+                                    padding: "10px 12px",
+                                    borderRadius: 12,
+                                    border: "1px solid rgba(0,0,0,0.15)",
+                                    background: "white",
+                                    fontWeight: 900,
+                                    cursor: "pointer",
+                                    }}
+                                >
+                                    Cancelar
+                                </button>
+                                </div>
+                            </div>
+                            )}
+
+
 
                         {showNuevoEstudiante && (
                             <div
