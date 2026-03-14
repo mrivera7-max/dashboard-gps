@@ -1,82 +1,87 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  serverTimestamp,
-  updateDoc,
-  getDocs,
-  query,
-  where,
-  writeBatch,
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    onSnapshot,
+    serverTimestamp,
+    updateDoc,
+    getDocs,
+    query,
+    where,
+    writeBatch,
+    setDoc,
 } from "firebase/firestore";
+
+import { generarInformeSemillero } from "./utils/generarInformeSemillero";
 
 import { db } from "./firebaseConfig";
 import * as XLSX from "xlsx";
 
 const cardStyle = {
-  border: "1px solid rgba(45,156,219,0.25)",
-  borderRadius: 14,
-  padding: 16,
-  background: "white",
-  boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+    border: "1px solid rgba(45,156,219,0.25)",
+    borderRadius: 14,
+    padding: 16,
+    background: "white",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
 };
 
 const inputStyle = {
-  width: "100%",
-  padding: "10px 12px",
-  borderRadius: 12,
-  border: "1px solid rgba(45,156,219,0.30)",
-  outline: "none",
-  fontWeight: 700,
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(45,156,219,0.30)",
+    outline: "none",
+    fontWeight: 700,
 };
 
 const thStyle = {
-  textAlign: "left",
-  padding: 8,
-  borderBottom: "1px solid #eee",
+    textAlign: "left",
+    padding: 8,
+    borderBottom: "1px solid #eee",
 };
 
 const tdStyle = {
-  padding: 8,
-  borderBottom: "1px solid #f3f3f3",
+    padding: 8,
+    borderBottom: "1px solid #f3f3f3",
 };
 
 const btnPrimary = {
-  padding: "10px 12px",
-  borderRadius: 12,
-  border: "none",
-  background: "#2D9CDB",
-  color: "white",
-  fontWeight: 900,
-  cursor: "pointer",
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "none",
+    background: "#2D9CDB",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
 };
 
 export default function SemillerosDocenteView({ semilleros = [] }) {
-  const [selectedId, setSelectedId] = useState("");
+    const [selectedId, setSelectedId] = useState("");
 
-  const [semilleristas, setSemilleristas] = useState([]);
-  const [showNuevoEstudiante, setShowNuevoEstudiante] = useState(false);
-  const [estudianteErr, setEstudianteErr] = useState("");
-  const [estudianteMsg, setEstudianteMsg] = useState("");
+    const [vistaSemillero, setVistaSemillero] = useState("detalle");
 
-  const [nuevoEstudiante, setNuevoEstudiante] = useState({
-    id_semillerista: "",
-    nombre: "",
-    codigo: "",
-    programa: "",
-    semestre: "",
-    correo: "",
-    telefono: "",
-    estado: "activo",
-    anio_ingreso: new Date().getFullYear(),
-  });
+    const [semilleristas, setSemilleristas] = useState([]);
+    const [showNuevoEstudiante, setShowNuevoEstudiante] = useState(false);
+    const [estudianteErr, setEstudianteErr] = useState("");
+    const [estudianteMsg, setEstudianteMsg] = useState("");
 
-  const [showAdminEstudiantes, setShowAdminEstudiantes] = useState(false);
+    const [nuevoEstudiante, setNuevoEstudiante] = useState({
+        id_semillerista: "",
+        nombre: "",
+        codigo: "",
+        programa: "",
+        semestre: "",
+        correo: "",
+        telefono: "",
+        estado: "activo",
+        anio_ingreso: new Date().getFullYear(),
+    });
 
-  const [proyectosSemillero, setProyectosSemillero] = useState([]);
+    const [showAdminEstudiantes, setShowAdminEstudiantes] = useState(false);
+
+    const [proyectosSemillero, setProyectosSemillero] = useState([]);
     const [showAdminProyectos, setShowAdminProyectos] = useState(false);
     const [showNuevoProyecto, setShowNuevoProyecto] = useState(false);
 
@@ -87,10 +92,10 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
     const [showExcelPreview, setShowExcelPreview] = useState(false);
 
     const [nuevoProyecto, setNuevoProyecto] = useState({
-    titulo: "",
-    descripcion: "",
-    estado: "En ejecución",
-    anio: new Date().getFullYear(),
+        titulo: "",
+        descripcion: "",
+        estado: "En ejecución",
+        anio: new Date().getFullYear(),
     });
 
     const [productosSemillero, setProductosSemillero] = useState([]);
@@ -101,12 +106,12 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
     const [productoMsg, setProductoMsg] = useState("");
 
     const [nuevoProducto, setNuevoProducto] = useState({
-    titulo: "",
-    tipo: "Póster",
-    estado: "En proceso",
-    anio: new Date().getFullYear(),
-    identificador: "",
-    proyecto_semillero_id: "",
+        titulo: "",
+        tipo: "Póster",
+        estado: "En proceso",
+        anio: new Date().getFullYear(),
+        identificador: "",
+        proyecto_semillero_id: "",
     });
 
     const [actividadesSemillero, setActividadesSemillero] = useState([]);
@@ -116,194 +121,206 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
     const [actividadErr, setActividadErr] = useState("");
     const [actividadMsg, setActividadMsg] = useState("");
 
+    const [informeErr, setInformeErr] = useState("");
+    const [informeMsg, setInformeMsg] = useState("");
+
     const [nuevaActividad, setNuevaActividad] = useState({
-    actividad: "",
-    tipo: "Reunión",
-    fecha: "",
-    descripcion: "",
-    estado: "Pendiente",
+        actividad: "",
+        tipo: "Reunión",
+        fecha: "",
+        descripcion: "",
+        estado: "Pendiente",
     });
-  
 
-  const selectedSemillero = useMemo(
-    () => semilleros.find((s) => s._docId === selectedId) || semilleros[0] || null,
-    [semilleros, selectedId]
-  );
+    const [formInforme, setFormInforme] = useState({
+        titulo_informe: "",
+        fecha_inicio: "",
+        fecha_final: "",
+        tipo_proyecto: "",
+        resumen: "",
+        objetivo_general: "",
+        metodologia: "",
+        conclusiones: "",
+        referencias_texto: "",
+        link_asistencia: "",
+        link_cvlac: "",
+        lider_grupo_nombre: "",
+        director_investigaciones_nombre: "",
+    });
 
-  {/* Estudiantes */}
-  const resumenEstudiantes = useMemo(() => {
-    const total = semilleristas.length;
-    const activos = semilleristas.filter(
-        (x) => String(x.estado || "").toLowerCase() === "activo"
-    ).length;
-    const inactivos = semilleristas.filter(
-        (x) => String(x.estado || "").toLowerCase() === "inactivo"
-    ).length;
 
-    return { total, activos, inactivos };
-    }, [semilleristas]);
 
-    <div style={{ marginTop: 14, overflowX: "auto" }}>
-    {semilleristas.length === 0 ? (
-        <div style={{ color: "#666" }}>
-        No hay estudiantes registrados en este semillero.
-        </div>
-    ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-            <tr>
-            <th style={thStyle}>ID</th>
-            <th style={thStyle}>Nombre</th>
-            <th style={thStyle}>Cédula</th>
-            <th style={thStyle}>Programa</th>
-            <th style={thStyle}>Semestre</th>
-            <th style={thStyle}>Estado</th>
-            </tr>
-        </thead>
-        <tbody>
-            {semilleristas.map((est) => (
-            <tr key={est._docId}>
-                <td style={tdStyle}>{est.id_semillerista || "—"}</td>
-                <td style={tdStyle}>{est.nombre || "—"}</td>
-                <td style={tdStyle}>{est.cedula || "—"}</td>
-                <td style={tdStyle}>{est.programa || "—"}</td>
-                <td style={tdStyle}>{est.semestre || "—"}</td>
-                <td style={tdStyle}>{est.estado || "—"}</td>
-            </tr>
-            ))}
-        </tbody>
-        </table>
-    )}
-    </div>
 
-  useEffect(() => {
-    if (!selectedSemillero?.id_semillero) {
-        setSemilleristas([]);
-        return;
-    }
-
-    const unsub = onSnapshot(
-        collection(db, "semilleristas"),
-        (snap) => {
-        const data = snap.docs
-            .map((d) => ({ _docId: d.id, ...d.data() }))
-            .filter(
-            (x) =>
-                String(x.semillero_id || "").trim() ===
-                String(selectedSemillero.id_semillero || "").trim()
-            )
-            .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
-
-        setSemilleristas(data);
-        },
-        (e) => {
-        console.error(e);
-        setEstudianteErr("Error leyendo estudiantes del semillero.");
-        }
+    const selectedSemillero = useMemo(
+        () => semilleros.find((s) => s._docId === selectedId) || semilleros[0] || null,
+        [semilleros, selectedId]
     );
 
-    return () => unsub();
+    useEffect(() => {
+        if (!selectedSemillero) return;
+
+        setFormInforme({
+            titulo_informe: selectedSemillero.titulo_informe || "",
+            fecha_inicio: selectedSemillero.fecha_inicio || "",
+            fecha_final: selectedSemillero.fecha_final || "",
+            tipo_proyecto:
+                selectedSemillero.tipo_proyecto || "Semillero de Investigación",
+            convocatoria: selectedSemillero.convocatoria || "",
+            entidad_financiadora: selectedSemillero.entidad_financiadora || "",
+            objetivo_general: selectedSemillero.objetivo_general || "",
+            metodologia: selectedSemillero.metodologia || "",
+            referencias_texto: selectedSemillero.referencias_texto || "",
+            link_asistencia: selectedSemillero.link_asistencia || "",
+            link_cvlac: selectedSemillero.link_cvlac || "",
+            lider_grupo_nombre: selectedSemillero.lider_grupo_nombre || "",
+            director_investigaciones_nombre:
+                selectedSemillero.director_investigaciones_nombre || "",
+        });
     }, [selectedSemillero]);
 
-  const guardarEstudiante = async () => {
-    try {
-        setEstudianteErr("");
-        setEstudianteMsg("");
+    // Estudiantes
+    const resumenEstudiantes = useMemo(() => {
+        const total = semilleristas.length;
+        const activos = semilleristas.filter(
+            (x) => String(x.estado || "").toLowerCase() === "activo"
+        ).length;
+        const inactivos = semilleristas.filter(
+            (x) => String(x.estado || "").toLowerCase() === "inactivo"
+        ).length;
 
+        return { total, activos, inactivos };
+    }, [semilleristas]);
+
+
+
+    useEffect(() => {
         if (!selectedSemillero?.id_semillero) {
-        setEstudianteErr("Debes seleccionar un semillero.");
-        return;
+            setSemilleristas([]);
+            return;
         }
 
-        const nombre = (nuevoEstudiante.nombre || "").trim();
-        if (!nombre) {
-        setEstudianteErr("El nombre del estudiante es obligatorio.");
-        return;
-        }
+        const unsub = onSnapshot(
+            collection(db, "semilleristas"),
+            (snap) => {
+                const data = snap.docs
+                    .map((d) => ({ _docId: d.id, ...d.data() }))
+                    .filter(
+                        (x) =>
+                            String(x.semillero_id || "").trim() ===
+                            String(selectedSemillero.id_semillero || "").trim()
+                    )
+                    .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
-         // 🔹 buscar estudiantes del mismo semillero
-        const q = query(
-        collection(db, "semilleristas"),
-        where("semillero_id", "==", selectedSemillero.id_semillero)
+                setSemilleristas(data);
+            },
+            (e) => {
+                console.error(e);
+                setEstudianteErr("Error leyendo estudiantes del semillero.");
+            }
         );
 
-        const snap = await getDocs(q);
+        return () => unsub();
+    }, [selectedSemillero]);
 
-        let max = 0;
+    const guardarEstudiante = async () => {
+        try {
+            setEstudianteErr("");
+            setEstudianteMsg("");
 
-        snap.docs.forEach((d) => {
-        const id = d.data().id_semillerista || "";
-        const num = parseInt(id.replace("SEM-", ""), 10);
-        if (!isNaN(num) && num > max) max = num;
-        });
+            if (!selectedSemillero?.id_semillero) {
+                setEstudianteErr("Debes seleccionar un semillero.");
+                return;
+            }
 
-        const next = max + 1;
+            const nombre = (nuevoEstudiante.nombre || "").trim();
+            if (!nombre) {
+                setEstudianteErr("El nombre del estudiante es obligatorio.");
+                return;
+            }
 
-        const idSem = "SEM-" + String(next).padStart(3, "0");
+            // 🔹 buscar estudiantes del mismo semillero
+            const q = query(
+                collection(db, "semilleristas"),
+                where("semillero_id", "==", selectedSemillero.id_semillero)
+            );
 
-        await addDoc(collection(db, "semilleristas"), {
-        ...nuevoEstudiante,
-        id_semillerista: idSem,
-        nombre,
-        semillero_id: selectedSemillero.id_semillero,
-        semillero_nombre: selectedSemillero.nombre || "",
-        anio_ingreso: Number(nuevoEstudiante.anio_ingreso) || new Date().getFullYear(),
-        semestre: Number(nuevoEstudiante.semestre) || 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        });
+            const snap = await getDocs(q);
 
-        setNuevoEstudiante({
-        id_semillerista: "",
-        nombre: "",
-        codigo: "",
-        programa: "",
-        semestre: "",
-        correo: "",
-        telefono: "",
-        estado: "activo",
-        anio_ingreso: new Date().getFullYear(),
-        });
+            let max = 0;
 
-        setShowNuevoEstudiante(false);
-        setEstudianteMsg("Estudiante agregado correctamente.");
-    } catch (e) {
-        console.error(e);
-        setEstudianteErr("Error guardando estudiante.");
-    }
+            snap.docs.forEach((d) => {
+                const id = d.data().id_semillerista || "";
+                const num = parseInt(id.replace("SEM-", ""), 10);
+                if (!isNaN(num) && num > max) max = num;
+            });
+
+            const next = max + 1;
+
+            const idSem = "SEM-" + String(next).padStart(3, "0");
+
+            await addDoc(collection(db, "semilleristas"), {
+                ...nuevoEstudiante,
+                id_semillerista: idSem,
+                nombre,
+                semillero_id: selectedSemillero.id_semillero,
+                semillero_nombre: selectedSemillero.nombre || "",
+                anio_ingreso: Number(nuevoEstudiante.anio_ingreso) || new Date().getFullYear(),
+                semestre: Number(nuevoEstudiante.semestre) || 0,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
+
+            setNuevoEstudiante({
+                id_semillerista: "",
+                nombre: "",
+                codigo: "",
+                programa: "",
+                semestre: "",
+                correo: "",
+                telefono: "",
+                estado: "activo",
+                anio_ingreso: new Date().getFullYear(),
+            });
+
+            setShowNuevoEstudiante(false);
+            setEstudianteMsg("Estudiante agregado correctamente.");
+        } catch (e) {
+            console.error(e);
+            setEstudianteErr("Error guardando estudiante.");
+        }
     };
 
-  const eliminarEstudiante = async (docId) => {
-    try {
-        setEstudianteErr("");
-        setEstudianteMsg("");
+    const eliminarEstudiante = async (docId) => {
+        try {
+            setEstudianteErr("");
+            setEstudianteMsg("");
 
-        const ok = window.confirm("¿Eliminar este estudiante del semillero?");
-        if (!ok) return;
+            const ok = window.confirm("¿Eliminar este estudiante del semillero?");
+            if (!ok) return;
 
-        await deleteDoc(doc(db, "semilleristas", docId));
-        setEstudianteMsg("Estudiante eliminado correctamente.");
-    } catch (e) {
-        console.error(e);
-        setEstudianteErr("Error eliminando estudiante.");
-    }
+            await deleteDoc(doc(db, "semilleristas", docId));
+            setEstudianteMsg("Estudiante eliminado correctamente.");
+        } catch (e) {
+            console.error(e);
+            setEstudianteErr("Error eliminando estudiante.");
+        }
     };
 
-  const cambiarEstadoEstudiante = async (docId, nuevoEstado) => {
-    try {
-        setEstudianteErr("");
-        setEstudianteMsg("");
+    const cambiarEstadoEstudiante = async (docId, nuevoEstado) => {
+        try {
+            setEstudianteErr("");
+            setEstudianteMsg("");
 
-        await updateDoc(doc(db, "semilleristas", docId), {
-        estado: nuevoEstado,
-        updatedAt: serverTimestamp(),
-        });
+            await updateDoc(doc(db, "semilleristas", docId), {
+                estado: nuevoEstado,
+                updatedAt: serverTimestamp(),
+            });
 
-        setEstudianteMsg("Estado del estudiante actualizado.");
-    } catch (e) {
-        console.error(e);
-        setEstudianteErr("Error actualizando estado del estudiante.");
-    }
+            setEstudianteMsg("Estado del estudiante actualizado.");
+        } catch (e) {
+            console.error(e);
+            setEstudianteErr("Error actualizando estado del estudiante.");
+        }
     };
 
     const handleExcelSemilleristas = async (e) => {
@@ -323,28 +340,28 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
             const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
             if (!rows.length) {
-            setEstudianteErr("El archivo Excel está vacío.");
-            return;
+                setEstudianteErr("El archivo Excel está vacío.");
+                return;
             }
 
             const normalizadas = rows.map((r) => ({
-            cedula: String(r.cedula || r.Cedula || r.cédula || r.Cédula || "").trim(),
-            nombre: String(r.nombre || r.Nombre || "").trim(),
-            programa: String(r.programa || r.Programa || "").trim(),
-            semestre: Number(r.semestre || r.Semestre || 0),
-            correo: String(r.correo || r.Correo || "").trim(),
-            telefono: String(r.telefono || r.Telefono || r.teléfono || r.Teléfono || "").trim(),
-            estado: String(r.estado || r.Estado || "activo").trim().toLowerCase() === "inactivo"
-                ? "inactivo"
-                : "activo",
-            anio_ingreso: Number(r.anio_ingreso || r.año_ingreso || r.Anio_ingreso || r.Año_ingreso || new Date().getFullYear()),
+                cedula: String(r.cedula || r.Cedula || r.cédula || r.Cédula || "").trim(),
+                nombre: String(r.nombre || r.Nombre || "").trim(),
+                programa: String(r.programa || r.Programa || "").trim(),
+                semestre: Number(r.semestre || r.Semestre || 0),
+                correo: String(r.correo || r.Correo || "").trim(),
+                telefono: String(r.telefono || r.Telefono || r.teléfono || r.Teléfono || "").trim(),
+                estado: String(r.estado || r.Estado || "activo").trim().toLowerCase() === "inactivo"
+                    ? "inactivo"
+                    : "activo",
+                anio_ingreso: Number(r.anio_ingreso || r.año_ingreso || r.Anio_ingreso || r.Año_ingreso || new Date().getFullYear()),
             }));
 
             const validas = normalizadas.filter((r) => r.nombre && r.cedula);
 
             if (!validas.length) {
-            setEstudianteErr("No se encontraron filas válidas. Debe existir al menos nombre y cédula.");
-            return;
+                setEstudianteErr("No se encontraron filas válidas. Debe existir al menos nombre y cédula.");
+                return;
             }
 
             setExcelRows(validas);
@@ -353,7 +370,7 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
             console.error(err);
             setEstudianteErr("Error leyendo el archivo Excel.");
         }
-        };
+    };
 
     const guardarExcelSemilleristas = async () => {
         try {
@@ -361,18 +378,18 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
             setEstudianteMsg("");
 
             if (!selectedSemillero?.id_semillero) {
-            setEstudianteErr("Debes seleccionar un semillero.");
-            return;
+                setEstudianteErr("Debes seleccionar un semillero.");
+                return;
             }
 
             if (!excelRows.length) {
-            setEstudianteErr("No hay datos cargados desde Excel.");
-            return;
+                setEstudianteErr("No hay datos cargados desde Excel.");
+                return;
             }
 
             const q = query(
-            collection(db, "semilleristas"),
-            where("semillero_id", "==", selectedSemillero.id_semillero)
+                collection(db, "semilleristas"),
+                where("semillero_id", "==", selectedSemillero.id_semillero)
             );
 
             const snap = await getDocs(q);
@@ -381,14 +398,14 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
             const cedulasExistentes = new Set();
 
             snap.docs.forEach((d) => {
-            const data = d.data();
+                const data = d.data();
 
-            const id = data.id_semillerista || "";
-            const num = parseInt(String(id).replace("SEM-", ""), 10);
-            if (!isNaN(num) && num > max) max = num;
+                const id = data.id_semillerista || "";
+                const num = parseInt(String(id).replace("SEM-", ""), 10);
+                if (!isNaN(num) && num > max) max = num;
 
-            const ced = String(data.cedula || "").trim();
-            if (ced) cedulasExistentes.add(ced);
+                const ced = String(data.cedula || "").trim();
+                if (ced) cedulasExistentes.add(ced);
             });
 
             const batch = writeBatch(db);
@@ -396,32 +413,32 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
             let agregados = 0;
 
             for (const row of excelRows) {
-            const ced = String(row.cedula || "").trim();
-            if (!ced || cedulasExistentes.has(ced)) continue;
+                const ced = String(row.cedula || "").trim();
+                if (!ced || cedulasExistentes.has(ced)) continue;
 
-            consecutivo += 1;
-            const idSem = "SEM-" + String(consecutivo).padStart(3, "0");
+                consecutivo += 1;
+                const idSem = "SEM-" + String(consecutivo).padStart(3, "0");
 
-            const ref = doc(collection(db, "semilleristas"));
+                const ref = doc(collection(db, "semilleristas"));
 
-            batch.set(ref, {
-                id_semillerista: idSem,
-                nombre: row.nombre,
-                cedula: ced,
-                programa: row.programa || "",
-                semestre: Number(row.semestre) || 0,
-                correo: row.correo || "",
-                telefono: row.telefono || "",
-                estado: row.estado || "activo",
-                anio_ingreso: Number(row.anio_ingreso) || new Date().getFullYear(),
-                semillero_id: selectedSemillero.id_semillero,
-                semillero_nombre: selectedSemillero.nombre || "",
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-            });
+                batch.set(ref, {
+                    id_semillerista: idSem,
+                    nombre: row.nombre,
+                    cedula: ced,
+                    programa: row.programa || "",
+                    semestre: Number(row.semestre) || 0,
+                    correo: row.correo || "",
+                    telefono: row.telefono || "",
+                    estado: row.estado || "activo",
+                    anio_ingreso: Number(row.anio_ingreso) || new Date().getFullYear(),
+                    semillero_id: selectedSemillero.id_semillero,
+                    semillero_nombre: selectedSemillero.nombre || "",
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                });
 
-            cedulasExistentes.add(ced);
-            agregados += 1;
+                cedulasExistentes.add(ced);
+                agregados += 1;
             }
 
             await batch.commit();
@@ -433,10 +450,10 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
             console.error(err);
             setEstudianteErr("Error guardando estudiantes desde Excel.");
         }
-        };
+    };
 
 
-    {/* Proyectos */}
+    // Proyectos
     useEffect(() => {
         if (!selectedSemillero?.id_semillero) {
             setProyectosSemillero([]);
@@ -446,27 +463,27 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
         const unsub = onSnapshot(
             collection(db, "semillero_proyectos"),
             (snap) => {
-            const data = snap.docs
-                .map((d) => ({ _docId: d.id, ...d.data() }))
-                .filter(
-                (x) =>
-                    String(x.semillero_id || "").trim() ===
-                    String(selectedSemillero.id_semillero || "").trim()
-                )
-                .sort((a, b) => (b.anio || 0) - (a.anio || 0));
+                const data = snap.docs
+                    .map((d) => ({ _docId: d.id, ...d.data() }))
+                    .filter(
+                        (x) =>
+                            String(x.semillero_id || "").trim() ===
+                            String(selectedSemillero.id_semillero || "").trim()
+                    )
+                    .sort((a, b) => (b.anio || 0) - (a.anio || 0));
 
-            setProyectosSemillero(data);
+                setProyectosSemillero(data);
             },
             (e) => {
-            console.error(e);
-            setProyectoErr("Error leyendo proyectos del semillero.");
+                console.error(e);
+                setProyectoErr("Error leyendo proyectos del semillero.");
             }
         );
 
         return () => unsub();
-        }, [selectedSemillero]);
+    }, [selectedSemillero]);
 
-        const resumenProyectos = useMemo(() => {
+    const resumenProyectos = useMemo(() => {
         const total = proyectosSemillero.length;
 
         const activos = proyectosSemillero.filter(
@@ -478,183 +495,28 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
         ).length;
 
         return { total, activos, finalizados };
-        }, [proyectosSemillero]);
+    }, [proyectosSemillero]);
 
-        const guardarProyecto = async () => {
-            try {
-                setProyectoErr("");
-                setProyectoMsg("");
+    const guardarProyecto = async () => {
+        try {
+            setProyectoErr("");
+            setProyectoMsg("");
 
-                if (!selectedSemillero?.id_semillero) {
+            if (!selectedSemillero?.id_semillero) {
                 setProyectoErr("Debes seleccionar un semillero.");
                 return;
-                }
+            }
 
-                const titulo = (nuevoProyecto.titulo || "").trim();
+            const titulo = (nuevoProyecto.titulo || "").trim();
 
-                if (!titulo) {
+            if (!titulo) {
                 setProyectoErr("El título del proyecto es obligatorio.");
                 return;
-                }
-
-                const q = query(
-                    collection(db, "semillero_proyectos"),
-                    where("semillero_id", "==", selectedSemillero.id_semillero)
-                    );
-
-                    const snap = await getDocs(q);
-
-                    let max = 0;
-
-                    snap.docs.forEach((d) => {
-                    const id = d.data().id_proyecto_semillero || "";
-                    const num = parseInt(id.replace("PS-", ""), 10);
-                    if (!isNaN(num) && num > max) max = num;
-                    });
-
-                    const next = max + 1;
-                    const idProyecto = "PS-" + String(next).padStart(3, "0");
-
-                await addDoc(collection(db, "semillero_proyectos"), {
-                ...nuevoProyecto,
-                id_proyecto_semillero: idProyecto,
-                titulo,
-                semillero_id: selectedSemillero.id_semillero,
-                semillero_nombre: selectedSemillero.nombre || "",
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                });
-
-                setNuevoProyecto({
-                titulo: "",
-                descripcion: "",
-                estado: "En ejecución",
-                anio: new Date().getFullYear(),
-                });
-
-                setShowNuevoProyecto(false);
-                setProyectoMsg("Proyecto creado correctamente.");
-            } catch (e) {
-                console.error(e);
-                setProyectoErr("Error guardando proyecto.");
             }
-        };
 
-            const eliminarProyecto = async (docId) => {
-                try {
-                    const ok = window.confirm("¿Eliminar este proyecto?");
-                    if (!ok) return;
-
-                    await deleteDoc(doc(db, "semillero_proyectos", docId));
-
-                    setProyectoMsg("Proyecto eliminado.");
-                } catch (e) {
-                    console.error(e);
-                    setProyectoErr("Error eliminando proyecto.");
-                }
-            };
-
-    const cambiarEstadoProyecto = async (docId, nuevoEstado) => {
-    try {
-        setProyectoErr("");
-        setProyectoMsg("");
-
-        await updateDoc(doc(db, "semillero_proyectos", docId), {
-        estado: nuevoEstado,
-        updatedAt: serverTimestamp(),
-        });
-
-        setProyectoMsg("Estado del proyecto actualizado.");
-    } catch (e) {
-        console.error(e);
-        setProyectoErr("Error actualizando estado del proyecto.");
-    }
-    };
-
-    {/* Productos */}
-    useEffect(() => {
-    if (!selectedSemillero?.id_semillero) {
-        setProductosSemillero([]);
-        return;
-    }
-
-    const unsub = onSnapshot(
-        collection(db, "semillero_productos"),
-        (snap) => {
-        const data = snap.docs
-            .map((d) => ({ _docId: d.id, ...d.data() }))
-            .filter(
-            (x) =>
-                String(x.semillero_id || "").trim() ===
-                String(selectedSemillero.id_semillero || "").trim()
-            )
-            .sort((a, b) => (b.anio || 0) - (a.anio || 0));
-
-        setProductosSemillero(data);
-        },
-        (e) => {
-        console.error(e);
-        setProductoErr("Error leyendo productos del semillero.");
-        }
-    );
-
-    return () => unsub();
-    }, [selectedSemillero]);
-
-    const cambiarEstadoProducto = async (docId, nuevoEstado) => {
-    try {
-        setProductoErr("");
-        setProductoMsg("");
-
-        await updateDoc(doc(db, "semillero_productos", docId), {
-        estado: nuevoEstado,
-        updatedAt: serverTimestamp(),
-        });
-
-        setProductoMsg("Estado del producto actualizado.");
-    } catch (e) {
-        console.error(e);
-        setProductoErr("Error actualizando estado del producto.");
-    }
-    };
-
-    const resumenProductos = useMemo(() => {
-    const total = productosSemillero.length;
-
-    const publicados = productosSemillero.filter(
-        (p) => (p.estado || "").toLowerCase() === "publicado"
-    ).length;
-
-    const enProceso = productosSemillero.filter(
-        (p) => (p.estado || "").toLowerCase() === "en proceso"
-    ).length;
-
-    const registrados = productosSemillero.filter(
-        (p) => String(p.estado || "").toLowerCase() === "registrado"
-    ).length;
-
-    return { total, publicados, enProceso, registrados };
-    }, [productosSemillero]);
-
-    const guardarProducto = async () => {
-    try {
-        setProductoErr("");
-        setProductoMsg("");
-
-        if (!selectedSemillero?.id_semillero) {
-        setProductoErr("Debes seleccionar un semillero.");
-        return;
-        }
-
-        const titulo = (nuevoProducto.titulo || "").trim();
-        if (!titulo) {
-        setProductoErr("El título del producto es obligatorio.");
-        return;
-        }
-
-        const q = query(
-            collection(db, "semillero_productos"),
-            where("semillero_id", "==", selectedSemillero.id_semillero)
+            const q = query(
+                collection(db, "semillero_proyectos"),
+                where("semillero_id", "==", selectedSemillero.id_semillero)
             );
 
             const snap = await getDocs(q);
@@ -662,174 +524,329 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
             let max = 0;
 
             snap.docs.forEach((d) => {
-            const id = d.data().id_producto_semillero || "";
-            const num = parseInt(id.replace("PRS-", ""), 10);
-            if (!isNaN(num) && num > max) max = num;
+                const id = d.data().id_proyecto_semillero || "";
+                const num = parseInt(id.replace("PS-", ""), 10);
+                if (!isNaN(num) && num > max) max = num;
             });
 
             const next = max + 1;
-            const idProducto = "PRS-" + String(next).padStart(3, "0");
+            const idProyecto = "PS-" + String(next).padStart(3, "0");
 
-        await addDoc(collection(db, "semillero_productos"), {
-        ...nuevoProducto,
-        id_producto_semillero: idProducto,
-        titulo,
-        semillero_id: selectedSemillero.id_semillero,
-        semillero_nombre: selectedSemillero.nombre || "",
-        anio: Number(nuevoProducto.anio) || new Date().getFullYear(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        });
+            await addDoc(collection(db, "semillero_proyectos"), {
+                ...nuevoProyecto,
+                id_proyecto_semillero: idProyecto,
+                titulo,
+                semillero_id: selectedSemillero.id_semillero,
+                semillero_nombre: selectedSemillero.nombre || "",
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
 
-        setNuevoProducto({
-        titulo: "",
-        tipo: "Póster",
-        estado: "En proceso",
-        anio: new Date().getFullYear(),
-        identificador: "",
-        proyecto_semillero_id: "",
-        });
+            setNuevoProyecto({
+                titulo: "",
+                descripcion: "",
+                estado: "En ejecución",
+                anio: new Date().getFullYear(),
+            });
 
-        setShowNuevoProducto(false);
-        setProductoMsg("Producto creado correctamente.");
-    } catch (e) {
-        console.error(e);
-        setProductoErr("Error guardando producto.");
-    }
-    };
-
-    const eliminarProducto = async (docId) => {
-    try {
-        const ok = window.confirm("¿Eliminar este producto?");
-        if (!ok) return;
-
-        await deleteDoc(doc(db, "semillero_productos", docId));
-        setProductoMsg("Producto eliminado.");
-    } catch (e) {
-        console.error(e);
-        setProductoErr("Error eliminando producto.");
-    }
-    };
-
-    {/* Actividades */}
-    useEffect(() => {
-    if (!selectedSemillero?.id_semillero) {
-        setActividadesSemillero([]);
-        return;
-    }
-
-    const unsub = onSnapshot(
-        collection(db, "semillero_actividades"),
-        (snap) => {
-        const data = snap.docs
-            .map((d) => ({ _docId: d.id, ...d.data() }))
-            .filter(
-            (x) =>
-                String(x.semillero_id || "").trim() ===
-                String(selectedSemillero.id_semillero || "").trim()
-            )
-            .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
-
-        setActividadesSemillero(data);
-        },
-        (e) => {
-        console.error(e);
-        setActividadErr("Error leyendo actividades del semillero.");
+            setShowNuevoProyecto(false);
+            setProyectoMsg("Proyecto creado correctamente.");
+        } catch (e) {
+            console.error(e);
+            setProyectoErr("Error guardando proyecto.");
         }
-    );
+    };
 
-    return () => unsub();
+    const eliminarProyecto = async (docId) => {
+        try {
+            const ok = window.confirm("¿Eliminar este proyecto?");
+            if (!ok) return;
+
+            await deleteDoc(doc(db, "semillero_proyectos", docId));
+
+            setProyectoMsg("Proyecto eliminado.");
+        } catch (e) {
+            console.error(e);
+            setProyectoErr("Error eliminando proyecto.");
+        }
+    };
+
+    const cambiarEstadoProyecto = async (docId, nuevoEstado) => {
+        try {
+            setProyectoErr("");
+            setProyectoMsg("");
+
+            await updateDoc(doc(db, "semillero_proyectos", docId), {
+                estado: nuevoEstado,
+                updatedAt: serverTimestamp(),
+            });
+
+            setProyectoMsg("Estado del proyecto actualizado.");
+        } catch (e) {
+            console.error(e);
+            setProyectoErr("Error actualizando estado del proyecto.");
+        }
+    };
+
+    // Productos
+    useEffect(() => {
+        if (!selectedSemillero?.id_semillero) {
+            setProductosSemillero([]);
+            return;
+        }
+
+        const unsub = onSnapshot(
+            collection(db, "semillero_productos"),
+            (snap) => {
+                const data = snap.docs
+                    .map((d) => ({ _docId: d.id, ...d.data() }))
+                    .filter(
+                        (x) =>
+                            String(x.semillero_id || "").trim() ===
+                            String(selectedSemillero.id_semillero || "").trim()
+                    )
+                    .sort((a, b) => (b.anio || 0) - (a.anio || 0));
+
+                setProductosSemillero(data);
+            },
+            (e) => {
+                console.error(e);
+                setProductoErr("Error leyendo productos del semillero.");
+            }
+        );
+
+        return () => unsub();
     }, [selectedSemillero]);
 
-    const resumenActividades = useMemo(() => {
-    const total = actividadesSemillero.length;
+    const cambiarEstadoProducto = async (docId, nuevoEstado) => {
+        try {
+            setProductoErr("");
+            setProductoMsg("");
 
-    const realizadas = actividadesSemillero.filter(
-        (a) => (a.estado || "").toLowerCase() === "realizada"
-    ).length;
+            await updateDoc(doc(db, "semillero_productos", docId), {
+                estado: nuevoEstado,
+                updatedAt: serverTimestamp(),
+            });
 
-    const pendientes = actividadesSemillero.filter(
-        (a) => (a.estado || "").toLowerCase() === "pendiente"
-    ).length;
-
-    const canceladas = actividadesSemillero.filter(
-        (a) => String(a.estado || "").toLowerCase() === "cancelada"
-    ).length;
-
-    return { total, realizadas, pendientes, canceladas };
-    }, [actividadesSemillero]);
-
-    const guardarActividad = async () => {
-    try {
-        setActividadErr("");
-        setActividadMsg("");
-
-        if (!selectedSemillero?.id_semillero) {
-        setActividadErr("Debes seleccionar un semillero.");
-        return;
+            setProductoMsg("Estado del producto actualizado.");
+        } catch (e) {
+            console.error(e);
+            setProductoErr("Error actualizando estado del producto.");
         }
+    };
 
-        const actividad = (nuevaActividad.actividad || "").trim();
-        if (!actividad) {
-        setActividadErr("El nombre de la actividad es obligatorio.");
-        return;
-        }
+    const resumenProductos = useMemo(() => {
+        const total = productosSemillero.length;
 
-        const q = query(
-            collection(db, "semillero_actividades"),
-            where("semillero_id", "==", selectedSemillero.id_semillero)
-        );
+        const publicados = productosSemillero.filter(
+            (p) => (p.estado || "").toLowerCase() === "publicado"
+        ).length;
+
+        const enProceso = productosSemillero.filter(
+            (p) => (p.estado || "").toLowerCase() === "en proceso"
+        ).length;
+
+        const registrados = productosSemillero.filter(
+            (p) => String(p.estado || "").toLowerCase() === "registrado"
+        ).length;
+
+        return { total, publicados, enProceso, registrados };
+    }, [productosSemillero]);
+
+    const guardarProducto = async () => {
+        try {
+            setProductoErr("");
+            setProductoMsg("");
+
+            if (!selectedSemillero?.id_semillero) {
+                setProductoErr("Debes seleccionar un semillero.");
+                return;
+            }
+
+            const titulo = (nuevoProducto.titulo || "").trim();
+            if (!titulo) {
+                setProductoErr("El título del producto es obligatorio.");
+                return;
+            }
+
+            const q = query(
+                collection(db, "semillero_productos"),
+                where("semillero_id", "==", selectedSemillero.id_semillero)
+            );
 
             const snap = await getDocs(q);
 
             let max = 0;
 
             snap.docs.forEach((d) => {
-            const id = d.data().id_actividad_semillero || "";
-            const num = parseInt(id.replace("ACT-", ""), 10);
-            if (!isNaN(num) && num > max) max = num;
+                const id = d.data().id_producto_semillero || "";
+                const num = parseInt(id.replace("PRS-", ""), 10);
+                if (!isNaN(num) && num > max) max = num;
+            });
+
+            const next = max + 1;
+            const idProducto = "PRS-" + String(next).padStart(3, "0");
+
+            await addDoc(collection(db, "semillero_productos"), {
+                ...nuevoProducto,
+                id_producto_semillero: idProducto,
+                titulo,
+                semillero_id: selectedSemillero.id_semillero,
+                semillero_nombre: selectedSemillero.nombre || "",
+                anio: Number(nuevoProducto.anio) || new Date().getFullYear(),
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
+
+            setNuevoProducto({
+                titulo: "",
+                tipo: "Póster",
+                estado: "En proceso",
+                anio: new Date().getFullYear(),
+                identificador: "",
+                proyecto_semillero_id: "",
+            });
+
+            setShowNuevoProducto(false);
+            setProductoMsg("Producto creado correctamente.");
+        } catch (e) {
+            console.error(e);
+            setProductoErr("Error guardando producto.");
+        }
+    };
+
+    const eliminarProducto = async (docId) => {
+        try {
+            const ok = window.confirm("¿Eliminar este producto?");
+            if (!ok) return;
+
+            await deleteDoc(doc(db, "semillero_productos", docId));
+            setProductoMsg("Producto eliminado.");
+        } catch (e) {
+            console.error(e);
+            setProductoErr("Error eliminando producto.");
+        }
+    };
+
+    // Actividades
+    useEffect(() => {
+        if (!selectedSemillero?.id_semillero) {
+            setActividadesSemillero([]);
+            return;
+        }
+
+        const unsub = onSnapshot(
+            collection(db, "semillero_actividades"),
+            (snap) => {
+                const data = snap.docs
+                    .map((d) => ({ _docId: d.id, ...d.data() }))
+                    .filter(
+                        (x) =>
+                            String(x.semillero_id || "").trim() ===
+                            String(selectedSemillero.id_semillero || "").trim()
+                    )
+                    .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+
+                setActividadesSemillero(data);
+            },
+            (e) => {
+                console.error(e);
+                setActividadErr("Error leyendo actividades del semillero.");
+            }
+        );
+
+        return () => unsub();
+    }, [selectedSemillero]);
+
+    const resumenActividades = useMemo(() => {
+        const total = actividadesSemillero.length;
+
+        const realizadas = actividadesSemillero.filter(
+            (a) => (a.estado || "").toLowerCase() === "realizada"
+        ).length;
+
+        const pendientes = actividadesSemillero.filter(
+            (a) => (a.estado || "").toLowerCase() === "pendiente"
+        ).length;
+
+        const canceladas = actividadesSemillero.filter(
+            (a) => String(a.estado || "").toLowerCase() === "cancelada"
+        ).length;
+
+        return { total, realizadas, pendientes, canceladas };
+    }, [actividadesSemillero]);
+
+    const guardarActividad = async () => {
+        try {
+            setActividadErr("");
+            setActividadMsg("");
+
+            if (!selectedSemillero?.id_semillero) {
+                setActividadErr("Debes seleccionar un semillero.");
+                return;
+            }
+
+            const actividad = (nuevaActividad.actividad || "").trim();
+            if (!actividad) {
+                setActividadErr("El nombre de la actividad es obligatorio.");
+                return;
+            }
+
+            const q = query(
+                collection(db, "semillero_actividades"),
+                where("semillero_id", "==", selectedSemillero.id_semillero)
+            );
+
+            const snap = await getDocs(q);
+
+            let max = 0;
+
+            snap.docs.forEach((d) => {
+                const id = d.data().id_actividad_semillero || "";
+                const num = parseInt(id.replace("ACT-", ""), 10);
+                if (!isNaN(num) && num > max) max = num;
             });
 
             const next = max + 1;
             const idActividad = "ACT-" + String(next).padStart(3, "0");
 
-        await addDoc(collection(db, "semillero_actividades"), {
-        ...nuevaActividad,
-        id_actividad_semillero: idActividad,
-        actividad,
-        semillero_id: selectedSemillero.id_semillero,
-        semillero_nombre: selectedSemillero.nombre || "",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        });
+            await addDoc(collection(db, "semillero_actividades"), {
+                ...nuevaActividad,
+                id_actividad_semillero: idActividad,
+                actividad,
+                semillero_id: selectedSemillero.id_semillero,
+                semillero_nombre: selectedSemillero.nombre || "",
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
 
-        setNuevaActividad({
-        actividad: "",
-        tipo: "Reunión",
-        fecha: "",
-        descripcion: "",
-        estado: "Pendiente",
-        });
+            setNuevaActividad({
+                actividad: "",
+                tipo: "Reunión",
+                fecha: "",
+                descripcion: "",
+                estado: "Pendiente",
+            });
 
-        setShowNuevaActividad(false);
-        setActividadMsg("Actividad creada correctamente.");
-    } catch (e) {
-        console.error(e);
-        setActividadErr("Error guardando actividad.");
-    }
+            setShowNuevaActividad(false);
+            setActividadMsg("Actividad creada correctamente.");
+        } catch (e) {
+            console.error(e);
+            setActividadErr("Error guardando actividad.");
+        }
     };
 
     const eliminarActividad = async (docId) => {
-    try {
-        const ok = window.confirm("¿Eliminar esta actividad?");
-        if (!ok) return;
+        try {
+            const ok = window.confirm("¿Eliminar esta actividad?");
+            if (!ok) return;
 
-        await deleteDoc(doc(db, "semillero_actividades", docId));
-        setActividadMsg("Actividad eliminada.");
-    } catch (e) {
-        console.error(e);
-        setActividadErr("Error eliminando actividad.");
-    }
+            await deleteDoc(doc(db, "semillero_actividades", docId));
+            setActividadMsg("Actividad eliminada.");
+        } catch (e) {
+            console.error(e);
+            setActividadErr("Error eliminando actividad.");
+        }
     };
 
     const cambiarEstadoActividad = async (docId, nuevoEstado) => {
@@ -838,8 +855,8 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
             setActividadMsg("");
 
             await updateDoc(doc(db, "semillero_actividades", docId), {
-            estado: nuevoEstado,
-            updatedAt: serverTimestamp(),
+                estado: nuevoEstado,
+                updatedAt: serverTimestamp(),
             });
 
             setActividadMsg("Estado de la actividad actualizado.");
@@ -847,1150 +864,1435 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
             console.error(e);
             setActividadErr("Error actualizando estado de la actividad.");
         }
-        };
+    };
 
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
-      <div style={cardStyle}>
-        <h3 style={{ marginTop: 0, color: "#1B75BC" }}>Mis semilleros</h3>
+    const guardarInformeFinal = async () => {
+        try {
+            setInformeErr("");
+            setInformeMsg("");
 
-        {semilleros.length === 0 ? (
-          <div style={{ color: "#666" }}>No tienes semilleros asignados.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 8 }}>
-            {semilleros.map((sem) => (
-              <button
-                key={sem._docId}
-                type="button"
-                onClick={() => setSelectedId(sem._docId)}
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  border:
-                    (selectedSemillero?._docId || "") === sem._docId
-                      ? "1px solid rgba(27,117,188,0.55)"
-                      : "1px solid rgba(45,156,219,0.25)",
-                  background:
-                    (selectedSemillero?._docId || "") === sem._docId
-                      ? "rgba(27,117,188,0.10)"
-                      : "white",
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                {sem.nombre || sem.id_semillero || sem._docId}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+            if (!selectedSemillero?._docId) {
+                setInformeErr("Debes seleccionar un semillero.");
+                return;
+            }
 
-      <div style={cardStyle}>
-        {!selectedSemillero ? (
-          <div>Selecciona un semillero.</div>
-        ) : (
-          <>
-            <h3 style={{ marginTop: 0, color: "#1B75BC" }}>
-              {selectedSemillero.nombre || "Semillero"}
-            </h3>
+            await setDoc(
+                doc(db, "semilleros", selectedSemillero._docId),
+                {
+                    ...formInforme,
+                    updatedAt: serverTimestamp(),
+                },
+                { merge: true }
+            );
 
-            <div style={{ display: "flex", gap: 20, alignItems: "center", marginBottom: 12 }}>
+            setInformeMsg("Datos del informe guardados correctamente.");
+        } catch (e) {
+            console.error(e);
+            setInformeErr("Error guardando los datos del informe.");
+        }
+    };
 
-                {selectedSemillero.logo_url && (
-                    <img
-                    src={selectedSemillero.logo_url}
-                    alt="Logo semillero"
-                    style={{
-                        width: 90,
-                        height: 90,
-                        objectFit: "contain",
-                        borderRadius: 12,
-                        border: "1px solid rgba(45,156,219,0.25)",
-                        padding: 6,
-                        background: "white",
-                    }}
-                    />
-                )}
+    const handleGenerarInforme = async () => {
+        try {
+            setInformeErr("");
+            setInformeMsg("");
 
-                <div style={{ display: "grid", gap: 6 }}>
-                    <div><b>ID:</b> {selectedSemillero.id_semillero || "—"}</div>
-                    <div><b>Estado:</b> {selectedSemillero.estado || "—"}</div>
-                    <div><b>Línea principal:</b> {selectedSemillero.linea_principal || "—"}</div>
-                    <div><b>Docente responsable:</b> {selectedSemillero.docente_responsable_nombre || "—"}</div>
-                    <div><b>Descripción:</b> {selectedSemillero.descripcion || "—"}</div>
-                </div>
+            if (!selectedSemillero?._docId) {
+                setInformeErr("Debes seleccionar un semillero.");
+                return;
+            }
 
-                </div>
+            const res = await generarInformeSemillero(selectedSemillero._docId);
 
-            <div>
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(45,156,219,0.18)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div>
-                        <h3 style={{ marginTop: 0, marginBottom: 4, color: "#1B75BC" }}>
-                            Estudiantes del semillero
-                        </h3>
-                        <div style={{ fontSize: 13, color: "#4A5568" }}>
-                            <b>Total:</b> {resumenEstudiantes.total}{" "}
-                            | <b>Activos:</b> {resumenEstudiantes.activos}{" "}
-                            | <b>Inactivos:</b> {resumenEstudiantes.inactivos}
-                        </div>
-                        </div>
+            if (!res.ok) {
+                setInformeErr(res.error || "No se pudo generar el informe.");
+                return;
+            }
 
-                        <button
-                        type="button"
-                        onClick={() => setShowAdminEstudiantes(true)}
-                        style={btnPrimary}
-                        >
-                        Administrar estudiantes
-                        </button>
-                    </div>
+            setInformeMsg(`Informe generado correctamente: ${res.nombreArchivo}`);
+        } catch (e) {
+            console.error(e);
+            setInformeErr("Error generando el informe.");
+        }
+    };
 
-                    {/* TABLA VISIBLE EN PANEL PRINCIPAL */}
-                    <div style={{ marginTop: 14, overflowX: "auto" }}>
-                        {semilleristas.length === 0 ? (
-                        <div style={{ color: "#666" }}>
-                            No hay estudiantes registrados en este semillero.
-                        </div>
-                        ) : (
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                            <thead>
-                            <tr>
-                                <th style={thStyle}>ID</th>
-                                <th style={thStyle}>Nombre</th>
-                                <th style={thStyle}>Cédula</th>
-                                <th style={thStyle}>Programa</th>
-                                <th style={thStyle}>Semestre</th>
-                                <th style={thStyle}>Estado</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {semilleristas.map((est) => (
-                                <tr key={est._docId}>
-                                <td style={tdStyle}>{est.id_semillerista || "—"}</td>
-                                <td style={tdStyle}>{est.nombre || "—"}</td>
-                                <td style={tdStyle}>{est.cedula || "—"}</td>
-                                <td style={tdStyle}>{est.programa || "—"}</td>
-                                <td style={tdStyle}>{est.semestre || "—"}</td>
-                                <td style={tdStyle}>{est.estado || "—"}</td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
-                        )}
-                    </div>
+    return (
+        <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
+            <div style={cardStyle}>
+                <h3 style={{ marginTop: 0, color: "#1B75BC" }}>Mis semilleros</h3>
 
+                {semilleros.length === 0 ? (
+                    <div style={{ color: "#666" }}>No tienes semilleros asignados.</div>
+                ) : (
+                    <div style={{ display: "grid", gap: 8 }}>
 
-
-                </div>
-
-                {estudianteErr ? (
-                    <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>
-                    {estudianteErr}
-                    </div>
-                ) : null}
-
-                {estudianteMsg ? (
-                    <div style={{ color: "#166534", fontWeight: 800, marginBottom: 8 }}>
-                    {estudianteMsg}
-                    </div>
-                ) : null}
-
-                {showAdminEstudiantes && (
-                    <div
-                        style={{
-                        position: "fixed",
-                        inset: 0,
-                        background: "rgba(0,0,0,0.45)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 9999,
-                        }}
-                    >
-                        <div
-                        style={{
-                            background: "white",
-                            width: 980,
-                            maxWidth: "95vw",
-                            maxHeight: "90vh",
-                            overflowY: "auto",
-                            borderRadius: 16,
-                            padding: 16,
-                        }}
-                        >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <h3 style={{ margin: 0, color: "#1B75BC" }}>
-                            Administrar estudiantes - {selectedSemillero?.nombre || "Semillero"}
-                            </h3>
-
-                            <button
-                            type="button"
-                            onClick={() => {
-                                setShowAdminEstudiantes(false);
-                                setShowNuevoEstudiante(false);
-                            }}
-                            style={{
-                                padding: "8px 10px",
-                                borderRadius: 10,
-                                border: "1px solid rgba(0,0,0,0.15)",
-                                background: "white",
-                                fontWeight: 900,
-                                cursor: "pointer",
-                            }}
-                            >
-                              ✕
-                            </button>
-                        </div>
-
-                        {estudianteErr ? (
-                            <div style={{ color: "#b91c1c", fontWeight: 800, marginTop: 10 }}>
-                            {estudianteErr}
-                            </div>
-                        ) : null}
-
-                        {estudianteMsg ? (
-                            <div style={{ color: "#166534", fontWeight: 800, marginTop: 10 }}>
-                            {estudianteMsg}
-                            </div>
-                        ) : null}
-
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-                            <button
-                                type="button"
-                                onClick={() => setShowNuevoEstudiante((s) => !s)}
-                                style={btnPrimary}
-                            >
-                                {showNuevoEstudiante ? "Ocultar formulario" : "Nuevo estudiante"}
-                            </button>
-
-                            <label
-                                style={{
-                                ...btnPrimary,
-                                display: "inline-flex",
-                                alignItems: "center",
-                                }}
-                            >
-                                Cargar Excel
-                                <input
-                                type="file"
-                                accept=".xlsx,.xls"
-                                onChange={handleExcelSemilleristas}
-                                style={{ display: "none" }}
-                                />
-                            </label>
-                        </div>
-
-                        {showExcelPreview && (
-                            <div
-                                style={{
-                                marginTop: 14,
-                                padding: 12,
-                                borderRadius: 12,
-                                border: "1px solid rgba(45,156,219,0.22)",
-                                background: "rgba(45,156,219,0.04)",
-                                }}
-                            >
-                                <div style={{ fontWeight: 900, color: "#1B75BC", marginBottom: 10 }}>
-                                Vista previa del Excel
-                                </div>
-
-                                <div style={{ overflowX: "auto" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                    <thead>
-                                    <tr>
-                                        <th style={thStyle}>Cédula</th>
-                                        <th style={thStyle}>Nombre</th>
-                                        <th style={thStyle}>Programa</th>
-                                        <th style={thStyle}>Semestre</th>
-                                        <th style={thStyle}>Estado</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    {excelRows.map((r, i) => (
-                                        <tr key={i}>
-                                        <td style={tdStyle}>{r.cedula || "—"}</td>
-                                        <td style={tdStyle}>{r.nombre || "—"}</td>
-                                        <td style={tdStyle}>{r.programa || "—"}</td>
-                                        <td style={tdStyle}>{r.semestre || "—"}</td>
-                                        <td style={tdStyle}>{r.estado || "—"}</td>
-                                        </tr>
-                                    ))}
-                                    </tbody>
-                                </table>
-                                </div>
-
-                                <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
-                                <button type="button" onClick={guardarExcelSemilleristas} style={btnPrimary}>
-                                    Guardar Excel
+                        {semilleros.map((sem) => (
+                            <div key={sem._docId} style={{ display: "grid", gap: 6 }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedId(sem._docId);
+                                        setVistaSemillero("detalle");
+                                    }}
+                                    style={{
+                                        width: "100%",
+                                        textAlign: "left",
+                                        padding: "10px 12px",
+                                        borderRadius: 12,
+                                        border:
+                                            (selectedSemillero?._docId || "") === sem._docId &&
+                                                vistaSemillero === "detalle"
+                                                ? "1px solid rgba(27,117,188,0.55)"
+                                                : "1px solid rgba(45,156,219,0.25)",
+                                        background:
+                                            (selectedSemillero?._docId || "") === sem._docId &&
+                                                vistaSemillero === "detalle"
+                                                ? "rgba(27,117,188,0.10)"
+                                                : "white",
+                                        fontWeight: 900,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    {sem.nombre || sem.id_semillero || sem._docId}
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={() => {
-                                    setExcelRows([]);
-                                    setShowExcelPreview(false);
+                                        setSelectedId(sem._docId);
+                                        setVistaSemillero("informe");
                                     }}
                                     style={{
-                                    padding: "10px 12px",
-                                    borderRadius: 12,
-                                    border: "1px solid rgba(0,0,0,0.15)",
-                                    background: "white",
-                                    fontWeight: 900,
-                                    cursor: "pointer",
+                                        width: "100%",
+                                        textAlign: "left",
+                                        padding: "9px 12px",
+                                        borderRadius: 12,
+                                        border:
+                                            (selectedSemillero?._docId || "") === sem._docId &&
+                                                vistaSemillero === "informe"
+                                                ? "1px solid rgba(27,117,188,0.55)"
+                                                : "1px solid rgba(45,156,219,0.20)",
+                                        background:
+                                            (selectedSemillero?._docId || "") === sem._docId &&
+                                                vistaSemillero === "informe"
+                                                ? "rgba(27,117,188,0.08)"
+                                                : "rgba(255,255,255,0.95)",
+                                        color: "#1B75BC",
+                                        fontWeight: 800,
+                                        cursor: "pointer",
                                     }}
                                 >
-                                    Cancelar
+                                    Informe final
                                 </button>
-                                </div>
                             </div>
-                            )}
-
-
-
-                        {showNuevoEstudiante && (
-                            <div
-                            style={{
-                                marginTop: 12,
-                                padding: 12,
-                                borderRadius: 12,
-                                border: "1px solid rgba(45,156,219,0.22)",
-                                background: "rgba(45,156,219,0.04)",
-                                display: "grid",
-                                gap: 10,
-                            }}
-                            >
-                            <input
-                                value={nuevoEstudiante.nombre}
-                                onChange={(e) => setNuevoEstudiante((s) => ({ ...s, nombre: e.target.value }))}
-                                style={inputStyle}
-                                placeholder="Nombre"
-                            />
-
-                            <input
-                                value={nuevoEstudiante.codigo}
-                                onChange={(e) => setNuevoEstudiante((s) => ({ ...s, codigo: e.target.value }))}
-                                style={inputStyle}
-                                placeholder="Código"
-                            />
-
-                            <input
-                                value={nuevoEstudiante.programa}
-                                onChange={(e) => setNuevoEstudiante((s) => ({ ...s, programa: e.target.value }))}
-                                style={inputStyle}
-                                placeholder="Programa"
-                            />
-
-                            <input
-                                type="number"
-                                value={nuevoEstudiante.semestre}
-                                onChange={(e) => setNuevoEstudiante((s) => ({ ...s, semestre: e.target.value }))}
-                                style={inputStyle}
-                                placeholder="Semestre"
-                            />
-
-                            <input
-                                value={nuevoEstudiante.correo}
-                                onChange={(e) => setNuevoEstudiante((s) => ({ ...s, correo: e.target.value }))}
-                                style={inputStyle}
-                                placeholder="Correo"
-                            />
-
-                            <input
-                                type="number"
-                                value={nuevoEstudiante.anio_ingreso}
-                                onChange={(e) => setNuevoEstudiante((s) => ({ ...s, anio_ingreso: e.target.value }))}
-                                style={inputStyle}
-                                placeholder="Año de ingreso"
-                            />
-
-                            <button type="button" onClick={guardarEstudiante} style={btnPrimary}>
-                                Guardar estudiante
-                            </button>
-                            </div>
-                        )}
-
-                        <div style={{ marginTop: 16, overflowX: "auto" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                            <thead>
-                                <tr>
-                                    <th style={thStyle}>ID</th>
-                                    <th style={thStyle}>Nombre</th>
-                                    <th style={thStyle}>Estado</th>
-                                    <th style={thStyle}>Acciones</th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                {semilleristas.map((est) => (
-                                <tr key={est._docId}>
-                                    <td style={tdStyle}>{est.id_semillerista || "—"}</td>
-                                    <td style={tdStyle}>{est.nombre || "—"}</td>
-                                    <td style={tdStyle}>
-                                    <select
-                                        value={est.estado || "activo"}
-                                        onChange={(e) => cambiarEstadoEstudiante(est._docId, e.target.value)}
-                                        style={{ ...inputStyle, padding: "8px 10px", maxWidth: 140 }}
-                                    >
-                                        <option value="activo">Activo</option>
-                                        <option value="inactivo">Inactivo</option>
-                                    </select>
-                                    </td>
-                                    <td style={tdStyle}>
-                                    <button
-                                        type="button"
-                                        onClick={() => eliminarEstudiante(est._docId)}
-                                        style={{
-                                        padding: "8px 10px",
-                                        borderRadius: 10,
-                                        border: "1px solid rgba(220,38,38,0.25)",
-                                        background: "rgba(220,38,38,0.08)",
-                                        color: "#B91C1C",
-                                        fontWeight: 900,
-                                        cursor: "pointer",
-                                        }}
-                                    >
-                                        Eliminar
-                                    </button>
-                                    </td>
-                                </tr>
-                                ))}
-                            </tbody>
-                            </table>
-                        </div>
-                        </div>
+                        ))}
                     </div>
                 )}
-                </div>
+            </div>
 
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(45,156,219,0.18)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                    <h3 style={{ marginTop: 0, marginBottom: 4, color: "#1B75BC" }}>
-                        Proyectos del semillero
-                    </h3>
+            <div style={cardStyle}>
+                {!selectedSemillero ? (
+                    <div>Selecciona un semillero.</div>
+                ) : vistaSemillero === "detalle" ? (
+                    <>
+                        <h3 style={{ marginTop: 0, color: "#1B75BC" }}>
+                            {selectedSemillero.nombre || "Semillero"}
+                        </h3>
 
-                    <div style={{ fontSize: 13, color: "#4A5568" }}>
-                        <b>Total:</b> {resumenProyectos.total} |{" "}
-                        <b>En ejecución:</b> {resumenProyectos.activos} |{" "}
-                        <b>Finalizados:</b> {resumenProyectos.finalizados}
-                    </div>
-                </div>
+                        <div style={{ display: "flex", gap: 20, alignItems: "center", marginBottom: 12 }}>
 
-                    <button
-                    type="button"
-                    onClick={() => setShowAdminProyectos(true)}
-                    style={btnPrimary}
-                    >
-                    Administrar proyectos
-                    </button>
-                </div>
+                            {selectedSemillero.logo_url && (
+                                <img
+                                    src={selectedSemillero.logo_url}
+                                    alt="Logo semillero"
+                                    style={{
+                                        width: 90,
+                                        height: 90,
+                                        objectFit: "contain",
+                                        borderRadius: 12,
+                                        border: "1px solid rgba(45,156,219,0.25)",
+                                        padding: 6,
+                                        background: "white",
+                                    }}
+                                />
+                            )}
 
-                <div style={{ marginTop: 14, overflowX: "auto" }}>
-                    {proyectosSemillero.length === 0 ? (
-                    <div style={{ color: "#666" }}>
-                        No hay proyectos registrados en este semillero.
-                    </div>
-                    ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead>
-                        <tr>
-                            <th style={thStyle}>ID</th>
-                            <th style={thStyle}>Título</th>
-                            <th style={thStyle}>Año</th>
-                            <th style={thStyle}>Estado</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {proyectosSemillero.map((p) => (
-                            <tr key={p._docId}>
-                            <td style={tdStyle}>{p.id_proyecto_semillero || "—"}</td>
-                            <td style={tdStyle}>{p.titulo || "—"}</td>
-                            <td style={tdStyle}>{p.anio || "—"}</td>
-                            <td style={tdStyle}>{p.estado || "—"}</td>
-                            </tr>
-                        ))}
-                        </tbody>
-                    </table>
-                    )}
-                </div>
-                
+                            <div style={{ display: "grid", gap: 6 }}>
+                                <div><b>ID:</b> {selectedSemillero.id_semillero || "—"}</div>
+                                <div><b>Estado:</b> {selectedSemillero.estado || "—"}</div>
+                                <div><b>Línea principal:</b> {selectedSemillero.linea_principal || "—"}</div>
+                                <div><b>Docente responsable:</b> {selectedSemillero.docente_responsable_nombre || "—"}</div>
+                                <div><b>Descripción:</b> {selectedSemillero.descripcion || "—"}</div>
+                            </div>
 
-                    {showAdminProyectos && (
-                        <div
-                            style={{
-                            position: "fixed",
-                            inset: 0,
-                            background: "rgba(0,0,0,0.45)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            zIndex: 9999,
-                            }}
-                        >
-                            <div
-                            style={{
-                                background: "white",
-                                width: 900,
-                                maxWidth: "95vw",
-                                borderRadius: 16,
-                                padding: 16,
-                            }}
-                            >
-                            <div
-                                style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    marginBottom: 12,
-                                }}
+                        </div>
+
+                        <div>
+                            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(45,156,219,0.18)" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <div>
+                                        <h3 style={{ marginTop: 0, marginBottom: 4, color: "#1B75BC" }}>
+                                            Estudiantes del semillero
+                                        </h3>
+                                        <div style={{ fontSize: 13, color: "#4A5568" }}>
+                                            <b>Total:</b> {resumenEstudiantes.total}{" "}
+                                            | <b>Activos:</b> {resumenEstudiantes.activos}{" "}
+                                            | <b>Inactivos:</b> {resumenEstudiantes.inactivos}
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAdminEstudiantes(true)}
+                                        style={btnPrimary}
+                                    >
+                                        Administrar estudiantes
+                                    </button>
+                                </div>
+
+                                {/* TABLA VISIBLE EN PANEL PRINCIPAL */}
+                                <div style={{ marginTop: 14, overflowX: "auto" }}>
+                                    {semilleristas.length === 0 ? (
+                                        <div style={{ color: "#666" }}>
+                                            No hay estudiantes registrados en este semillero.
+                                        </div>
+                                    ) : (
+                                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                            <thead>
+                                                <tr>
+                                                    <th style={thStyle}>ID</th>
+                                                    <th style={thStyle}>Nombre</th>
+                                                    <th style={thStyle}>Cédula</th>
+                                                    <th style={thStyle}>Programa</th>
+                                                    <th style={thStyle}>Semestre</th>
+                                                    <th style={thStyle}>Estado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {semilleristas.map((est) => (
+                                                    <tr key={est._docId}>
+                                                        <td style={tdStyle}>{est.id_semillerista || "—"}</td>
+                                                        <td style={tdStyle}>{est.nombre || "—"}</td>
+                                                        <td style={tdStyle}>{est.cedula || "—"}</td>
+                                                        <td style={tdStyle}>{est.programa || "—"}</td>
+                                                        <td style={tdStyle}>{est.semestre || "—"}</td>
+                                                        <td style={tdStyle}>{est.estado || "—"}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+
+
+
+                            </div>
+
+                            {estudianteErr ? (
+                                <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>
+                                    {estudianteErr}
+                                </div>
+                            ) : null}
+
+                            {estudianteMsg ? (
+                                <div style={{ color: "#166534", fontWeight: 800, marginBottom: 8 }}>
+                                    {estudianteMsg}
+                                </div>
+                            ) : null}
+
+                            {showAdminEstudiantes && (
+                                <div
+                                    style={{
+                                        position: "fixed",
+                                        inset: 0,
+                                        background: "rgba(0,0,0,0.45)",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        zIndex: 9999,
+                                    }}
                                 >
-                                <h3 style={{ margin: 0, color: "#1B75BC" }}>
-                                    Administrar proyectos - {selectedSemillero?.nombre}
-                                </h3>
+                                    <div
+                                        style={{
+                                            background: "white",
+                                            width: 980,
+                                            maxWidth: "95vw",
+                                            maxHeight: "90vh",
+                                            overflowY: "auto",
+                                            borderRadius: 16,
+                                            padding: 16,
+                                        }}
+                                    >
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                            <h3 style={{ margin: 0, color: "#1B75BC" }}>
+                                                Administrar estudiantes - {selectedSemillero?.nombre || "Semillero"}
+                                            </h3>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowAdminEstudiantes(false);
+                                                    setShowNuevoEstudiante(false);
+                                                }}
+                                                style={{
+                                                    padding: "8px 10px",
+                                                    borderRadius: 10,
+                                                    border: "1px solid rgba(0,0,0,0.15)",
+                                                    background: "white",
+                                                    fontWeight: 900,
+                                                    cursor: "pointer",
+                                                }}
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+
+                                        {estudianteErr ? (
+                                            <div style={{ color: "#b91c1c", fontWeight: 800, marginTop: 10 }}>
+                                                {estudianteErr}
+                                            </div>
+                                        ) : null}
+
+                                        {estudianteMsg ? (
+                                            <div style={{ color: "#166534", fontWeight: 800, marginTop: 10 }}>
+                                                {estudianteMsg}
+                                            </div>
+                                        ) : null}
+
+                                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowNuevoEstudiante((s) => !s)}
+                                                style={btnPrimary}
+                                            >
+                                                {showNuevoEstudiante ? "Ocultar formulario" : "Nuevo estudiante"}
+                                            </button>
+
+                                            <label
+                                                style={{
+                                                    ...btnPrimary,
+                                                    display: "inline-flex",
+                                                    alignItems: "center",
+                                                }}
+                                            >
+                                                Cargar Excel
+                                                <input
+                                                    type="file"
+                                                    accept=".xlsx,.xls"
+                                                    onChange={handleExcelSemilleristas}
+                                                    style={{ display: "none" }}
+                                                />
+                                            </label>
+                                        </div>
+
+                                        {showExcelPreview && (
+                                            <div
+                                                style={{
+                                                    marginTop: 14,
+                                                    padding: 12,
+                                                    borderRadius: 12,
+                                                    border: "1px solid rgba(45,156,219,0.22)",
+                                                    background: "rgba(45,156,219,0.04)",
+                                                }}
+                                            >
+                                                <div style={{ fontWeight: 900, color: "#1B75BC", marginBottom: 10 }}>
+                                                    Vista previa del Excel
+                                                </div>
+
+                                                <div style={{ overflowX: "auto" }}>
+                                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                                        <thead>
+                                                            <tr>
+                                                                <th style={thStyle}>Cédula</th>
+                                                                <th style={thStyle}>Nombre</th>
+                                                                <th style={thStyle}>Programa</th>
+                                                                <th style={thStyle}>Semestre</th>
+                                                                <th style={thStyle}>Estado</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {excelRows.map((r, i) => (
+                                                                <tr key={i}>
+                                                                    <td style={tdStyle}>{r.cedula || "—"}</td>
+                                                                    <td style={tdStyle}>{r.nombre || "—"}</td>
+                                                                    <td style={tdStyle}>{r.programa || "—"}</td>
+                                                                    <td style={tdStyle}>{r.semestre || "—"}</td>
+                                                                    <td style={tdStyle}>{r.estado || "—"}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+                                                    <button type="button" onClick={guardarExcelSemilleristas} style={btnPrimary}>
+                                                        Guardar Excel
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setExcelRows([]);
+                                                            setShowExcelPreview(false);
+                                                        }}
+                                                        style={{
+                                                            padding: "10px 12px",
+                                                            borderRadius: 12,
+                                                            border: "1px solid rgba(0,0,0,0.15)",
+                                                            background: "white",
+                                                            fontWeight: 900,
+                                                            cursor: "pointer",
+                                                        }}
+                                                    >
+                                                        Cancelar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+
+
+                                        {showNuevoEstudiante && (
+                                            <div
+                                                style={{
+                                                    marginTop: 12,
+                                                    padding: 12,
+                                                    borderRadius: 12,
+                                                    border: "1px solid rgba(45,156,219,0.22)",
+                                                    background: "rgba(45,156,219,0.04)",
+                                                    display: "grid",
+                                                    gap: 10,
+                                                }}
+                                            >
+                                                <input
+                                                    value={nuevoEstudiante.nombre}
+                                                    onChange={(e) => setNuevoEstudiante((s) => ({ ...s, nombre: e.target.value }))}
+                                                    style={inputStyle}
+                                                    placeholder="Nombre"
+                                                />
+
+                                                <input
+                                                    value={nuevoEstudiante.codigo}
+                                                    onChange={(e) => setNuevoEstudiante((s) => ({ ...s, codigo: e.target.value }))}
+                                                    style={inputStyle}
+                                                    placeholder="Código"
+                                                />
+
+                                                <input
+                                                    value={nuevoEstudiante.programa}
+                                                    onChange={(e) => setNuevoEstudiante((s) => ({ ...s, programa: e.target.value }))}
+                                                    style={inputStyle}
+                                                    placeholder="Programa"
+                                                />
+
+                                                <input
+                                                    type="number"
+                                                    value={nuevoEstudiante.semestre}
+                                                    onChange={(e) => setNuevoEstudiante((s) => ({ ...s, semestre: e.target.value }))}
+                                                    style={inputStyle}
+                                                    placeholder="Semestre"
+                                                />
+
+                                                <input
+                                                    value={nuevoEstudiante.correo}
+                                                    onChange={(e) => setNuevoEstudiante((s) => ({ ...s, correo: e.target.value }))}
+                                                    style={inputStyle}
+                                                    placeholder="Correo"
+                                                />
+
+                                                <input
+                                                    type="number"
+                                                    value={nuevoEstudiante.anio_ingreso}
+                                                    onChange={(e) => setNuevoEstudiante((s) => ({ ...s, anio_ingreso: e.target.value }))}
+                                                    style={inputStyle}
+                                                    placeholder="Año de ingreso"
+                                                />
+
+                                                <button type="button" onClick={guardarEstudiante} style={btnPrimary}>
+                                                    Guardar estudiante
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        <div style={{ marginTop: 16, overflowX: "auto" }}>
+                                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th style={thStyle}>ID</th>
+                                                        <th style={thStyle}>Nombre</th>
+                                                        <th style={thStyle}>Estado</th>
+                                                        <th style={thStyle}>Acciones</th>
+                                                    </tr>
+                                                </thead>
+
+                                                <tbody>
+                                                    {semilleristas.map((est) => (
+                                                        <tr key={est._docId}>
+                                                            <td style={tdStyle}>{est.id_semillerista || "—"}</td>
+                                                            <td style={tdStyle}>{est.nombre || "—"}</td>
+                                                            <td style={tdStyle}>
+                                                                <select
+                                                                    value={est.estado || "activo"}
+                                                                    onChange={(e) => cambiarEstadoEstudiante(est._docId, e.target.value)}
+                                                                    style={{ ...inputStyle, padding: "8px 10px", maxWidth: 140 }}
+                                                                >
+                                                                    <option value="activo">Activo</option>
+                                                                    <option value="inactivo">Inactivo</option>
+                                                                </select>
+                                                            </td>
+                                                            <td style={tdStyle}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => eliminarEstudiante(est._docId)}
+                                                                    style={{
+                                                                        padding: "8px 10px",
+                                                                        borderRadius: 10,
+                                                                        border: "1px solid rgba(220,38,38,0.25)",
+                                                                        background: "rgba(220,38,38,0.08)",
+                                                                        color: "#B91C1C",
+                                                                        fontWeight: 900,
+                                                                        cursor: "pointer",
+                                                                    }}
+                                                                >
+                                                                    Eliminar
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(45,156,219,0.18)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                    <h3 style={{ marginTop: 0, marginBottom: 4, color: "#1B75BC" }}>
+                                        Proyectos del semillero
+                                    </h3>
+
+                                    <div style={{ fontSize: 13, color: "#4A5568" }}>
+                                        <b>Total:</b> {resumenProyectos.total} |{" "}
+                                        <b>En ejecución:</b> {resumenProyectos.activos} |{" "}
+                                        <b>Finalizados:</b> {resumenProyectos.finalizados}
+                                    </div>
+                                </div>
 
                                 <button
                                     type="button"
-                                    onClick={() => setShowAdminProyectos(false)}
+                                    onClick={() => setShowAdminProyectos(true)}
+                                    style={btnPrimary}
+                                >
+                                    Administrar proyectos
+                                </button>
+                            </div>
+
+                            <div style={{ marginTop: 14, overflowX: "auto" }}>
+                                {proyectosSemillero.length === 0 ? (
+                                    <div style={{ color: "#666" }}>
+                                        No hay proyectos registrados en este semillero.
+                                    </div>
+                                ) : (
+                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                        <thead>
+                                            <tr>
+                                                <th style={thStyle}>ID</th>
+                                                <th style={thStyle}>Título</th>
+                                                <th style={thStyle}>Año</th>
+                                                <th style={thStyle}>Estado</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {proyectosSemillero.map((p) => (
+                                                <tr key={p._docId}>
+                                                    <td style={tdStyle}>{p.id_proyecto_semillero || "—"}</td>
+                                                    <td style={tdStyle}>{p.titulo || "—"}</td>
+                                                    <td style={tdStyle}>{p.anio || "—"}</td>
+                                                    <td style={tdStyle}>{p.estado || "—"}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+
+
+                            {showAdminProyectos && (
+                                <div
                                     style={{
-                                    padding: "6px 10px",
-                                    borderRadius: 10,
-                                    border: "1px solid rgba(0,0,0,0.15)",
-                                    background: "white",
-                                    fontWeight: 900,
-                                    cursor: "pointer",
+                                        position: "fixed",
+                                        inset: 0,
+                                        background: "rgba(0,0,0,0.45)",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        zIndex: 9999,
                                     }}
                                 >
-                                    ✕
-                                </button>
-                                </div>
-
-                            <button onClick={() => setShowNuevoProyecto((s) => !s)} style={btnPrimary}>
-                                {showNuevoProyecto ? "Cerrar formulario" : "Nuevo proyecto"}
-                            </button>
-
-                            {showNuevoProyecto && (
-                                <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
-                                <input
-                                    placeholder="Título del proyecto"
-                                    value={nuevoProyecto.titulo}
-                                    onChange={(e) =>
-                                    setNuevoProyecto((s) => ({ ...s, titulo: e.target.value }))
-                                    }
-                                    style={inputStyle}
-                                />
-
-                                <textarea
-                                    placeholder="Descripción"
-                                    value={nuevoProyecto.descripcion}
-                                    onChange={(e) =>
-                                    setNuevoProyecto((s) => ({ ...s, descripcion: e.target.value }))
-                                    }
-                                    style={inputStyle}
-                                />
-
-                                <input
-                                    type="number"
-                                    value={nuevoProyecto.anio}
-                                    onChange={(e) =>
-                                    setNuevoProyecto((s) => ({ ...s, anio: e.target.value }))
-                                    }
-                                    style={inputStyle}
-                                />
-
-                                <select
-                                    value={nuevoProyecto.estado}
-                                    onChange={(e) =>
-                                        setNuevoProyecto((s) => ({ ...s, estado: e.target.value }))
-                                    }
-                                    style={inputStyle}
+                                    <div
+                                        style={{
+                                            background: "white",
+                                            width: 900,
+                                            maxWidth: "95vw",
+                                            borderRadius: 16,
+                                            padding: 16,
+                                        }}
                                     >
-                                    <option value="En ejecución">En ejecución</option>
-                                    <option value="Finalizado">Finalizado</option>
-                                </select>
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                                marginBottom: 12,
+                                            }}
+                                        >
+                                            <h3 style={{ margin: 0, color: "#1B75BC" }}>
+                                                Administrar proyectos - {selectedSemillero?.nombre}
+                                            </h3>
 
-                                <button onClick={guardarProyecto} style={btnPrimary}>
-                                    Guardar proyecto
-                                </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAdminProyectos(false)}
+                                                style={{
+                                                    padding: "6px 10px",
+                                                    borderRadius: 10,
+                                                    border: "1px solid rgba(0,0,0,0.15)",
+                                                    background: "white",
+                                                    fontWeight: 900,
+                                                    cursor: "pointer",
+                                                }}
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+
+                                        <button onClick={() => setShowNuevoProyecto((s) => !s)} style={btnPrimary}>
+                                            {showNuevoProyecto ? "Cerrar formulario" : "Nuevo proyecto"}
+                                        </button>
+
+                                        {showNuevoProyecto && (
+                                            <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+                                                <input
+                                                    placeholder="Título del proyecto"
+                                                    value={nuevoProyecto.titulo}
+                                                    onChange={(e) =>
+                                                        setNuevoProyecto((s) => ({ ...s, titulo: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                />
+
+                                                <textarea
+                                                    placeholder="Descripción"
+                                                    value={nuevoProyecto.descripcion}
+                                                    onChange={(e) =>
+                                                        setNuevoProyecto((s) => ({ ...s, descripcion: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                />
+
+                                                <input
+                                                    type="number"
+                                                    value={nuevoProyecto.anio}
+                                                    onChange={(e) =>
+                                                        setNuevoProyecto((s) => ({ ...s, anio: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                />
+
+                                                <select
+                                                    value={nuevoProyecto.estado}
+                                                    onChange={(e) =>
+                                                        setNuevoProyecto((s) => ({ ...s, estado: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                >
+                                                    <option value="En ejecución">En ejecución</option>
+                                                    <option value="Finalizado">Finalizado</option>
+                                                </select>
+
+                                                <button onClick={guardarProyecto} style={btnPrimary}>
+                                                    Guardar proyecto
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        <div style={{ marginTop: 20 }}>
+                                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th style={thStyle}>ID</th>
+                                                        <th style={thStyle}>Título</th>
+                                                        <th style={thStyle}>Estado</th>
+                                                        <th style={thStyle}>Acciones</th>
+                                                    </tr>
+                                                </thead>
+
+                                                <tbody>
+                                                    {proyectosSemillero.map((p) => (
+                                                        <tr key={p._docId}>
+                                                            <td style={tdStyle}>{p.id_proyecto_semillero}</td>
+                                                            <td style={tdStyle}>{p.titulo}</td>
+                                                            <td style={tdStyle}>
+                                                                <select
+                                                                    value={p.estado || "En ejecución"}
+                                                                    onChange={(e) => cambiarEstadoProyecto(p._docId, e.target.value)}
+                                                                    style={{ ...inputStyle, padding: "8px 10px", maxWidth: 160 }}
+                                                                >
+                                                                    <option value="En ejecución">En ejecución</option>
+                                                                    <option value="Finalizado">Finalizado</option>
+                                                                </select>
+                                                            </td>
+
+                                                            <td style={tdStyle}>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => eliminarProyecto(p._docId)}
+                                                                    style={{
+                                                                        padding: "8px 10px",
+                                                                        borderRadius: 10,
+                                                                        border: "1px solid rgba(220,38,38,0.25)",
+                                                                        background: "rgba(220,38,38,0.08)",
+                                                                        color: "#B91C1C",
+                                                                        fontWeight: 900,
+                                                                        cursor: "pointer",
+                                                                    }}
+                                                                >
+                                                                    Eliminar
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+
+                                    </div>
                                 </div>
                             )}
+                        </div>
 
-                            <div style={{ marginTop: 20 }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                <thead>
-                                    <tr>
-                                    <th style={thStyle}>ID</th>
-                                    <th style={thStyle}>Título</th>
-                                    <th style={thStyle}>Estado</th>
-                                    <th style={thStyle}>Acciones</th>
-                                    </tr>
-                                </thead>
+                        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(45,156,219,0.18)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                    <h3 style={{ marginTop: 0, marginBottom: 4, color: "#1B75BC" }}>
+                                        Productos del semillero
+                                    </h3>
 
-                                <tbody>
-                                    {proyectosSemillero.map((p) => (
-                                    <tr key={p._docId}>
-                                        <td style={tdStyle}>{p.id_proyecto_semillero}</td>
-                                        <td style={tdStyle}>{p.titulo}</td>
-                                        <td style={tdStyle}>
-                                            <select
-                                            value={p.estado || "En ejecución"}
-                                            onChange={(e) => cambiarEstadoProyecto(p._docId, e.target.value)}
-                                            style={{ ...inputStyle, padding: "8px 10px", maxWidth: 160 }}
+                                    <div style={{ fontSize: 13, color: "#4A5568" }}>
+                                        <b>Total:</b> {resumenProductos.total} |{" "}
+                                        <b>En proceso:</b> {resumenProductos.enProceso} |{" "}
+                                        <b>Publicados:</b> {resumenProductos.publicados} |{" "}
+                                        <b>Registrados:</b> {resumenProductos.registrados}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAdminProductos(true)}
+                                    style={btnPrimary}
+                                >
+                                    Administrar productos
+                                </button>
+                            </div>
+
+                            <div style={{ marginTop: 14, overflowX: "auto" }}>
+                                {productosSemillero.length === 0 ? (
+                                    <div style={{ color: "#666" }}>
+                                        No hay productos registrados en este semillero.
+                                    </div>
+                                ) : (
+                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                        <thead>
+                                            <tr>
+                                                <th style={thStyle}>ID</th>
+                                                <th style={thStyle}>Título</th>
+                                                <th style={thStyle}>Tipo</th>
+                                                <th style={thStyle}>Año</th>
+                                                <th style={thStyle}>Estado</th>
+                                                <th style={thStyle}>Identificador</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {productosSemillero.map((p) => (
+                                                <tr key={p._docId}>
+                                                    <td style={tdStyle}>{p.id_producto_semillero || "—"}</td>
+                                                    <td style={tdStyle}>{p.titulo || "—"}</td>
+                                                    <td style={tdStyle}>{p.tipo || "—"}</td>
+                                                    <td style={tdStyle}>{p.anio || "—"}</td>
+                                                    <td style={tdStyle}>{p.estado || "—"}</td>
+                                                    <td style={tdStyle}>{p.identificador || "—"}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+
+                            {showAdminProductos && (
+                                <div
+                                    style={{
+                                        position: "fixed",
+                                        inset: 0,
+                                        background: "rgba(0,0,0,0.45)",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        zIndex: 9999,
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            background: "white",
+                                            width: 980,
+                                            maxWidth: "95vw",
+                                            maxHeight: "90vh",
+                                            overflowY: "auto",
+                                            borderRadius: 16,
+                                            padding: 16,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                                marginBottom: 12,
+                                            }}
+                                        >
+                                            <h3 style={{ margin: 0, color: "#1B75BC" }}>
+                                                Administrar productos - {selectedSemillero?.nombre}
+                                            </h3>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAdminProductos(false)}
+                                                style={{
+                                                    padding: "6px 10px",
+                                                    borderRadius: 10,
+                                                    border: "1px solid rgba(0,0,0,0.15)",
+                                                    background: "white",
+                                                    fontWeight: 900,
+                                                    cursor: "pointer",
+                                                }}
                                             >
-                                            <option value="En ejecución">En ejecución</option>
-                                            <option value="Finalizado">Finalizado</option>
-                                            </select>
-                                        </td>
+                                                ✕
+                                            </button>
+                                        </div>
 
-                                        <td style={tdStyle}>
+                                        {productoErr ? (
+                                            <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>
+                                                {productoErr}
+                                            </div>
+                                        ) : null}
+
+                                        {productoMsg ? (
+                                            <div style={{ color: "#166534", fontWeight: 800, marginBottom: 8 }}>
+                                                {productoMsg}
+                                            </div>
+                                        ) : null}
 
                                         <button
                                             type="button"
-                                            onClick={() => eliminarProyecto(p._docId)}
+                                            onClick={() => setShowNuevoProducto((s) => !s)}
+                                            style={btnPrimary}
+                                        >
+                                            {showNuevoProducto ? "Cerrar formulario" : "Nuevo producto"}
+                                        </button>
+
+                                        {showNuevoProducto && (
+                                            <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+                                                <input
+                                                    placeholder="Título del producto"
+                                                    value={nuevoProducto.titulo}
+                                                    onChange={(e) =>
+                                                        setNuevoProducto((s) => ({ ...s, titulo: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                />
+
+                                                <select
+                                                    value={nuevoProducto.tipo}
+                                                    onChange={(e) =>
+                                                        setNuevoProducto((s) => ({ ...s, tipo: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                >
+                                                    <option value="Póster">Póster</option>
+                                                    <option value="Ponencia">Ponencia</option>
+                                                    <option value="Artículo">Artículo</option>
+                                                    <option value="Prototipo">Prototipo</option>
+                                                    <option value="Informe">Informe</option>
+                                                    <option value="Otro">Otro</option>
+                                                </select>
+
+                                                <select
+                                                    value={nuevoProducto.estado}
+                                                    onChange={(e) =>
+                                                        setNuevoProducto((s) => ({ ...s, estado: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                >
+                                                    <option value="En proceso">En proceso</option>
+                                                    <option value="Publicado">Publicado</option>
+                                                    <option value="Registrado">Registrado</option>
+                                                </select>
+
+                                                <input
+                                                    type="number"
+                                                    value={nuevoProducto.anio}
+                                                    onChange={(e) =>
+                                                        setNuevoProducto((s) => ({ ...s, anio: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                    placeholder="Año"
+                                                />
+
+                                                <input
+                                                    placeholder="Identificador (opcional)"
+                                                    value={nuevoProducto.identificador}
+                                                    onChange={(e) =>
+                                                        setNuevoProducto((s) => ({ ...s, identificador: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                />
+
+                                                <select
+                                                    value={nuevoProducto.proyecto_semillero_id}
+                                                    onChange={(e) =>
+                                                        setNuevoProducto((s) => ({
+                                                            ...s,
+                                                            proyecto_semillero_id: e.target.value,
+                                                        }))
+                                                    }
+                                                    style={inputStyle}
+                                                >
+                                                    <option value="">Sin proyecto asociado</option>
+                                                    {proyectosSemillero.map((p) => (
+                                                        <option key={p._docId} value={p.id_proyecto_semillero}>
+                                                            {p.id_proyecto_semillero} - {p.titulo}
+                                                        </option>
+                                                    ))}
+                                                </select>
+
+                                                <button onClick={guardarProducto} style={btnPrimary}>
+                                                    Guardar producto
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        <div style={{ marginTop: 20, overflowX: "auto" }}>
+                                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th style={thStyle}>ID</th>
+                                                        <th style={thStyle}>Título</th>
+                                                        <th style={thStyle}>Estado</th>
+                                                        <th style={thStyle}>Acción</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {productosSemillero.map((p) => (
+                                                        <tr key={p._docId}>
+                                                            <td style={tdStyle}>{p.id_producto_semillero || "—"}</td>
+                                                            <td style={tdStyle}>{p.titulo || "—"}</td>
+                                                            <td style={tdStyle}>{p.identificador || "—"}</td>
+                                                            <td style={tdStyle}>
+                                                                <select
+                                                                    value={p.estado || "En proceso"}
+                                                                    onChange={(e) => cambiarEstadoProducto(p._docId, e.target.value)}
+                                                                    style={{ ...inputStyle, padding: "8px 10px", maxWidth: 150 }}
+                                                                >
+                                                                    <option value="En proceso">En proceso</option>
+                                                                    <option value="Publicado">Publicado</option>
+                                                                    <option value="Registrado">Registrado</option>
+                                                                </select>
+                                                            </td>
+                                                            <td style={tdStyle}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => eliminarProducto(p._docId)}
+                                                                    style={{
+                                                                        padding: "8px 10px",
+                                                                        borderRadius: 10,
+                                                                        border: "1px solid rgba(220,38,38,0.25)",
+                                                                        background: "rgba(220,38,38,0.08)",
+                                                                        color: "#B91C1C",
+                                                                        fontWeight: 900,
+                                                                        cursor: "pointer",
+                                                                    }}
+                                                                >
+                                                                    Eliminar
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(45,156,219,0.18)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                    <h3 style={{ marginTop: 0, marginBottom: 4, color: "#1B75BC" }}>
+                                        Actividades del semillero
+                                    </h3>
+
+                                    <div style={{ fontSize: 13, color: "#4A5568" }}>
+                                        <b>Total:</b> {resumenActividades.total} |{" "}
+                                        <b>Realizadas:</b> {resumenActividades.realizadas} |{" "}
+                                        <b>Pendientes:</b> {resumenActividades.pendientes}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAdminActividades(true)}
+                                    style={btnPrimary}
+                                >
+                                    Administrar actividades
+                                </button>
+                            </div>
+
+                            <div style={{ marginTop: 14, overflowX: "auto" }}>
+                                {actividadesSemillero.length === 0 ? (
+                                    <div style={{ color: "#666" }}>
+                                        No hay actividades registradas en este semillero.
+                                    </div>
+                                ) : (
+                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                        <thead>
+                                            <tr>
+                                                <th style={thStyle}>ID</th>
+                                                <th style={thStyle}>Actividad</th>
+                                                <th style={thStyle}>Tipo</th>
+                                                <th style={thStyle}>Fecha</th>
+                                                <th style={thStyle}>Estado</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {actividadesSemillero.map((a) => (
+                                                <tr key={a._docId}>
+                                                    <td style={tdStyle}>{a.id_actividad_semillero || "—"}</td>
+                                                    <td style={tdStyle}>{a.actividad || "—"}</td>
+                                                    <td style={tdStyle}>{a.tipo || "—"}</td>
+                                                    <td style={tdStyle}>{a.fecha || "—"}</td>
+                                                    <td style={tdStyle}>{a.estado || "—"}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+
+                            {showAdminActividades && (
+                                <div
+                                    style={{
+                                        position: "fixed",
+                                        inset: 0,
+                                        background: "rgba(0,0,0,0.45)",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        zIndex: 9999,
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            background: "white",
+                                            width: 980,
+                                            maxWidth: "95vw",
+                                            maxHeight: "90vh",
+                                            overflowY: "auto",
+                                            borderRadius: 16,
+                                            padding: 16,
+                                        }}
+                                    >
+                                        <div
                                             style={{
-                                            padding: "8px 10px",
-                                            borderRadius: 10,
-                                            border: "1px solid rgba(220,38,38,0.25)",
-                                            background: "rgba(220,38,38,0.08)",
-                                            color: "#B91C1C",
-                                            fontWeight: 900,
-                                            cursor: "pointer",
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                                marginBottom: 12,
                                             }}
                                         >
-                                            Eliminar
+                                            <h3 style={{ margin: 0, color: "#1B75BC" }}>
+                                                Administrar actividades - {selectedSemillero?.nombre}
+                                            </h3>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAdminActividades(false)}
+                                                style={{
+                                                    padding: "6px 10px",
+                                                    borderRadius: 10,
+                                                    border: "1px solid rgba(0,0,0,0.15)",
+                                                    background: "white",
+                                                    fontWeight: 900,
+                                                    cursor: "pointer",
+                                                }}
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+
+                                        {informeErr ? (
+                                            <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>
+                                                {informeErr}
+                                            </div>
+                                        ) : null}
+
+                                        {informeMsg ? (
+                                            <div style={{ color: "#166534", fontWeight: 800, marginBottom: 8 }}>
+                                                {informeMsg}
+                                            </div>
+                                        ) : null}
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNuevaActividad((s) => !s)}
+                                            style={btnPrimary}
+                                        >
+                                            {showNuevaActividad ? "Cerrar formulario" : "Nueva actividad"}
                                         </button>
-                                        </td>
-                                    </tr>
-                                    ))}
-                                </tbody>
-                                </table>
+
+                                        {showNuevaActividad && (
+                                            <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+                                                <input
+                                                    placeholder="Nombre de la actividad"
+                                                    value={nuevaActividad.actividad}
+                                                    onChange={(e) =>
+                                                        setNuevaActividad((s) => ({ ...s, actividad: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                />
+
+                                                <select
+                                                    value={nuevaActividad.tipo}
+                                                    onChange={(e) =>
+                                                        setNuevaActividad((s) => ({ ...s, tipo: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                >
+                                                    <option value="Reunión">Reunión</option>
+                                                    <option value="Taller">Taller</option>
+                                                    <option value="Capacitación">Capacitación</option>
+                                                    <option value="Socialización">Socialización</option>
+                                                    <option value="Evento">Evento</option>
+                                                    <option value="Otro">Otro</option>
+                                                </select>
+
+                                                <input
+                                                    type="date"
+                                                    value={nuevaActividad.fecha}
+                                                    onChange={(e) =>
+                                                        setNuevaActividad((s) => ({ ...s, fecha: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                />
+
+                                                <textarea
+                                                    placeholder="Descripción"
+                                                    value={nuevaActividad.descripcion}
+                                                    onChange={(e) =>
+                                                        setNuevaActividad((s) => ({ ...s, descripcion: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                />
+
+                                                <select
+                                                    value={nuevaActividad.estado}
+                                                    onChange={(e) =>
+                                                        setNuevaActividad((s) => ({ ...s, estado: e.target.value }))
+                                                    }
+                                                    style={inputStyle}
+                                                >
+                                                    <option value="Pendiente">Pendiente</option>
+                                                    <option value="Realizada">Realizada</option>
+                                                    <option value="Cancelada">Cancelada</option>
+                                                </select>
+
+                                                <button onClick={guardarActividad} style={btnPrimary}>
+                                                    Guardar actividad
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        <div style={{ marginTop: 20, overflowX: "auto" }}>
+                                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th style={thStyle}>ID</th>
+                                                        <th style={thStyle}>Actividad</th>
+                                                        <th style={thStyle}>Estado</th>
+                                                        <th style={thStyle}>Acción</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {actividadesSemillero.map((a) => (
+                                                        <tr key={a._docId}>
+                                                            <td style={tdStyle}>{a.id_actividad_semillero || "—"}</td>
+                                                            <td style={tdStyle}>{a.actividad || "—"}</td>
+                                                            <td style={tdStyle}>
+                                                                <select
+                                                                    value={a.estado || "Pendiente"}
+                                                                    onChange={(e) =>
+                                                                        cambiarEstadoActividad(a._docId, e.target.value)
+                                                                    }
+                                                                    style={{ ...inputStyle, padding: "8px 10px", maxWidth: 160 }}
+                                                                >
+                                                                    <option value="Pendiente">Pendiente</option>
+                                                                    <option value="Realizada">Realizada</option>
+                                                                    <option value="Cancelada">Cancelada</option>
+                                                                </select>
+                                                            </td>
+                                                            <td style={tdStyle}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => eliminarActividad(a._docId)}
+                                                                    style={{
+                                                                        padding: "8px 10px",
+                                                                        borderRadius: 10,
+                                                                        border: "1px solid rgba(220,38,38,0.25)",
+                                                                        background: "rgba(220,38,38,0.08)",
+                                                                        color: "#B91C1C",
+                                                                        fontWeight: 900,
+                                                                        cursor: "pointer",
+                                                                    }}
+                                                                >
+                                                                    Eliminar
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </>
+
+                ) : (
+                    <>
+                        <h3 style={{ marginTop: 0, color: "#1B75BC" }}>
+                            Informe final - {selectedSemillero.nombre || "Semillero"}
+                        </h3>
+
+                        {informeErr ? (
+                            <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>
+                                {informeErr}
                             </div>
+                        ) : null}
 
-                            
+                        {informeMsg ? (
+                            <div style={{ color: "#166534", fontWeight: 800, marginBottom: 8 }}>
+                                {informeMsg}
                             </div>
-                        </div>
-                        )}
-                    </div>
-
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(45,156,219,0.18)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                    <h3 style={{ marginTop: 0, marginBottom: 4, color: "#1B75BC" }}>
-                        Productos del semillero
-                    </h3>
-
-                    <div style={{ fontSize: 13, color: "#4A5568" }}>
-                        <b>Total:</b> {resumenProductos.total} |{" "}
-                        <b>En proceso:</b> {resumenProductos.enProceso} |{" "}
-                        <b>Publicados:</b> {resumenProductos.publicados} |{" "}
-                        <b>Registrados:</b> {resumenProductos.registrados}
-                    </div>
-                    </div>
-
-                    <button
-                    type="button"
-                    onClick={() => setShowAdminProductos(true)}
-                    style={btnPrimary}
-                    >
-                    Administrar productos
-                    </button>
-                </div>
-
-                <div style={{ marginTop: 14, overflowX: "auto" }}>
-                    {productosSemillero.length === 0 ? (
-                    <div style={{ color: "#666" }}>
-                        No hay productos registrados en este semillero.
-                    </div>
-                    ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead>
-                        <tr>
-                            <th style={thStyle}>ID</th>
-                            <th style={thStyle}>Título</th>
-                            <th style={thStyle}>Tipo</th>
-                            <th style={thStyle}>Año</th>
-                            <th style={thStyle}>Estado</th>
-                            <th style={thStyle}>Identificador</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {productosSemillero.map((p) => (
-                            <tr key={p._docId}>
-                            <td style={tdStyle}>{p.id_producto_semillero || "—"}</td>
-                            <td style={tdStyle}>{p.titulo || "—"}</td>
-                            <td style={tdStyle}>{p.tipo || "—"}</td>
-                            <td style={tdStyle}>{p.anio || "—"}</td>
-                            <td style={tdStyle}>{p.estado || "—"}</td>
-                            <td style={tdStyle}>{p.identificador || "—"}</td>
-                            </tr>
-                        ))}
-                        </tbody>
-                    </table>
-                    )}
-                </div>
-
-                {showAdminProductos && (
-                    <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        background: "rgba(0,0,0,0.45)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 9999,
-                    }}
-                    >
-                    <div
-                        style={{
-                        background: "white",
-                        width: 980,
-                        maxWidth: "95vw",
-                        maxHeight: "90vh",
-                        overflowY: "auto",
-                        borderRadius: 16,
-                        padding: 16,
-                        }}
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginBottom: 12,
-                            }}
-                            >
-                            <h3 style={{ margin: 0, color: "#1B75BC" }}>
-                                Administrar productos - {selectedSemillero?.nombre}
-                            </h3>
-
-                            <button
-                                type="button"
-                                onClick={() => setShowAdminProductos(false)}
-                                style={{
-                                padding: "6px 10px",
-                                borderRadius: 10,
-                                border: "1px solid rgba(0,0,0,0.15)",
-                                background: "white",
-                                fontWeight: 900,
-                                cursor: "pointer",
-                                }}
-                            >
-                                ✕
-                            </button>
-                            </div>
-
-                        {productoErr ? (
-                        <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>
-                            {productoErr}
-                        </div>
                         ) : null}
 
-                        {productoMsg ? (
-                        <div style={{ color: "#166534", fontWeight: 800, marginBottom: 8 }}>
-                            {productoMsg}
-                        </div>
-                        ) : null}
-
-                        <button
-                        type="button"
-                        onClick={() => setShowNuevoProducto((s) => !s)}
-                        style={btnPrimary}
-                        >
-                        {showNuevoProducto ? "Cerrar formulario" : "Nuevo producto"}
-                        </button>
-
-                        {showNuevoProducto && (
-                        <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
-                            <input
-                            placeholder="Título del producto"
-                            value={nuevoProducto.titulo}
-                            onChange={(e) =>
-                                setNuevoProducto((s) => ({ ...s, titulo: e.target.value }))
-                            }
-                            style={inputStyle}
-                            />
-
-                            <select
-                            value={nuevoProducto.tipo}
-                            onChange={(e) =>
-                                setNuevoProducto((s) => ({ ...s, tipo: e.target.value }))
-                            }
-                            style={inputStyle}
-                            >
-                            <option value="Póster">Póster</option>
-                            <option value="Ponencia">Ponencia</option>
-                            <option value="Artículo">Artículo</option>
-                            <option value="Prototipo">Prototipo</option>
-                            <option value="Informe">Informe</option>
-                            <option value="Otro">Otro</option>
-                            </select>
-
-                            <select
-                            value={nuevoProducto.estado}
-                            onChange={(e) =>
-                                setNuevoProducto((s) => ({ ...s, estado: e.target.value }))
-                            }
-                            style={inputStyle}
-                            >
-                            <option value="En proceso">En proceso</option>
-                            <option value="Publicado">Publicado</option>
-                            <option value="Registrado">Registrado</option>
-                            </select>
-
-                            <input
-                            type="number"
-                            value={nuevoProducto.anio}
-                            onChange={(e) =>
-                                setNuevoProducto((s) => ({ ...s, anio: e.target.value }))
-                            }
-                            style={inputStyle}
-                            placeholder="Año"
-                            />
-
-                            <input
-                            placeholder="Identificador (opcional)"
-                            value={nuevoProducto.identificador}
-                            onChange={(e) =>
-                                setNuevoProducto((s) => ({ ...s, identificador: e.target.value }))
-                            }
-                            style={inputStyle}
-                            />
-
-                            <select
-                            value={nuevoProducto.proyecto_semillero_id}
-                            onChange={(e) =>
-                                setNuevoProducto((s) => ({
-                                ...s,
-                                proyecto_semillero_id: e.target.value,
-                                }))
-                            }
-                            style={inputStyle}
-                            >
-                            <option value="">Sin proyecto asociado</option>
-                            {proyectosSemillero.map((p) => (
-                                <option key={p._docId} value={p.id_proyecto_semillero}>
-                                {p.id_proyecto_semillero} - {p.titulo}
-                                </option>
-                            ))}
-                            </select>
-
-                            <button onClick={guardarProducto} style={btnPrimary}>
-                            Guardar producto
-                            </button>
-                        </div>
-                        )}
-
-                        <div style={{ marginTop: 20, overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                            <thead>
-                            <tr>
-                                <th style={thStyle}>ID</th>
-                                <th style={thStyle}>Título</th>
-                                <th style={thStyle}>Estado</th>
-                                <th style={thStyle}>Acción</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {productosSemillero.map((p) => (
-                                <tr key={p._docId}>
-                                <td style={tdStyle}>{p.id_producto_semillero || "—"}</td>
-                                <td style={tdStyle}>{p.titulo || "—"}</td>
-                                <td style={tdStyle}>{p.identificador || "—"}</td>
-                                <td style={tdStyle}>
-                                    <select
-                                    value={p.estado || "En proceso"}
-                                    onChange={(e) => cambiarEstadoProducto(p._docId, e.target.value)}
-                                    style={{ ...inputStyle, padding: "8px 10px", maxWidth: 150 }}
-                                    >
-                                    <option value="En proceso">En proceso</option>
-                                    <option value="Publicado">Publicado</option>
-                                    <option value="Registrado">Registrado</option>
-                                    </select>
-                                </td>
-                                <td style={tdStyle}>
-                                    <button
-                                    type="button"
-                                    onClick={() => eliminarProducto(p._docId)}
-                                    style={{
-                                        padding: "8px 10px",
-                                        borderRadius: 10,
-                                        border: "1px solid rgba(220,38,38,0.25)",
-                                        background: "rgba(220,38,38,0.08)",
-                                        color: "#B91C1C",
-                                        fontWeight: 900,
-                                        cursor: "pointer",
-                                    }}
-                                    >
-                                    Eliminar
-                                    </button>
-                                </td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
-                        </div>
-
-                        
-                    </div>
-                    </div>
-                )}
-                </div>
-
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(45,156,219,0.18)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                    <h3 style={{ marginTop: 0, marginBottom: 4, color: "#1B75BC" }}>
-                        Actividades del semillero
-                    </h3>
-
-                    <div style={{ fontSize: 13, color: "#4A5568" }}>
-                        <b>Total:</b> {resumenActividades.total} |{" "}
-                        <b>Realizadas:</b> {resumenActividades.realizadas} |{" "}
-                        <b>Pendientes:</b> {resumenActividades.pendientes}
-                    </div>
-                    </div>
-
-                    <button
-                    type="button"
-                    onClick={() => setShowAdminActividades(true)}
-                    style={btnPrimary}
-                    >
-                    Administrar actividades
-                    </button>
-                </div>
-
-                <div style={{ marginTop: 14, overflowX: "auto" }}>
-                    {actividadesSemillero.length === 0 ? (
-                    <div style={{ color: "#666" }}>
-                        No hay actividades registradas en este semillero.
-                    </div>
-                    ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead>
-                        <tr>
-                            <th style={thStyle}>ID</th>
-                            <th style={thStyle}>Actividad</th>
-                            <th style={thStyle}>Tipo</th>
-                            <th style={thStyle}>Fecha</th>
-                            <th style={thStyle}>Estado</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {actividadesSemillero.map((a) => (
-                            <tr key={a._docId}>
-                            <td style={tdStyle}>{a.id_actividad_semillero || "—"}</td>
-                            <td style={tdStyle}>{a.actividad || "—"}</td>
-                            <td style={tdStyle}>{a.tipo || "—"}</td>
-                            <td style={tdStyle}>{a.fecha || "—"}</td>
-                            <td style={tdStyle}>{a.estado || "—"}</td>
-                            </tr>
-                        ))}
-                        </tbody>
-                    </table>
-                    )}
-                </div>
-
-                {showAdminActividades && (
-                    <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        background: "rgba(0,0,0,0.45)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 9999,
-                    }}
-                    >
-                    <div
-                        style={{
-                        background: "white",
-                        width: 980,
-                        maxWidth: "95vw",
-                        maxHeight: "90vh",
-                        overflowY: "auto",
-                        borderRadius: 16,
-                        padding: 16,
-                        }}
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginBottom: 12,
-                            }}
-                            >
-                            <h3 style={{ margin: 0, color: "#1B75BC" }}>
-                                Administrar actividades - {selectedSemillero?.nombre}
-                            </h3>
-
-                            <button
-                                type="button"
-                                onClick={() => setShowAdminActividades(false)}
-                                style={{
-                                padding: "6px 10px",
-                                borderRadius: 10,
-                                border: "1px solid rgba(0,0,0,0.15)",
-                                background: "white",
-                                fontWeight: 900,
-                                cursor: "pointer",
-                                }}
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        {actividadErr ? (
-                        <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>
-                            {actividadErr}
-                        </div>
-                        ) : null}
-
-                        {actividadMsg ? (
-                        <div style={{ color: "#166534", fontWeight: 800, marginBottom: 8 }}>
-                            {actividadMsg}
-                        </div>
-                        ) : null}
-
-                        <button
-                        type="button"
-                        onClick={() => setShowNuevaActividad((s) => !s)}
-                        style={btnPrimary}
-                        >
-                        {showNuevaActividad ? "Cerrar formulario" : "Nueva actividad"}
-                        </button>
-
-                        {showNuevaActividad && (
-                        <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
-                            <input
-                            placeholder="Nombre de la actividad"
-                            value={nuevaActividad.actividad}
-                            onChange={(e) =>
-                                setNuevaActividad((s) => ({ ...s, actividad: e.target.value }))
-                            }
-                            style={inputStyle}
-                            />
-
-                            <select
-                            value={nuevaActividad.tipo}
-                            onChange={(e) =>
-                                setNuevaActividad((s) => ({ ...s, tipo: e.target.value }))
-                            }
-                            style={inputStyle}
-                            >
-                            <option value="Reunión">Reunión</option>
-                            <option value="Taller">Taller</option>
-                            <option value="Capacitación">Capacitación</option>
-                            <option value="Socialización">Socialización</option>
-                            <option value="Evento">Evento</option>
-                            <option value="Otro">Otro</option>
-                            </select>
-
-                            <input
-                            type="date"
-                            value={nuevaActividad.fecha}
-                            onChange={(e) =>
-                                setNuevaActividad((s) => ({ ...s, fecha: e.target.value }))
-                            }
-                            style={inputStyle}
-                            />
-
-                            <textarea
-                            placeholder="Descripción"
-                            value={nuevaActividad.descripcion}
-                            onChange={(e) =>
-                                setNuevaActividad((s) => ({ ...s, descripcion: e.target.value }))
-                            }
-                            style={inputStyle}
-                            />
-
-                            <select
-                            value={nuevaActividad.estado}
-                            onChange={(e) =>
-                                setNuevaActividad((s) => ({ ...s, estado: e.target.value }))
-                            }
-                            style={inputStyle}
-                            >
-                            <option value="Pendiente">Pendiente</option>
-                            <option value="Realizada">Realizada</option>
-                            <option value="Cancelada">Cancelada</option>
-                            </select>
-
-                            <button onClick={guardarActividad} style={btnPrimary}>
-                            Guardar actividad
-                            </button>
-                        </div>
-                        )}
-
-                        <div style={{ marginTop: 20, overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                            <thead>
-                            <tr>
-                                <th style={thStyle}>ID</th>
-                                <th style={thStyle}>Actividad</th>
-                                <th style={thStyle}>Estado</th>
-                                <th style={thStyle}>Acción</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {actividadesSemillero.map((a) => (
-                                <tr key={a._docId}>
-                                <td style={tdStyle}>{a.id_actividad_semillero || "—"}</td>
-                                <td style={tdStyle}>{a.actividad || "—"}</td>
-                                <td style={tdStyle}>
-                                    <select
-                                    value={a.estado || "Pendiente"}
+                        <div style={{ display: "grid", gap: 12 }}>
+                            <div>
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>Título del proyecto</div>
+                                <input
+                                    value={formInforme.titulo_informe}
                                     onChange={(e) =>
-                                        cambiarEstadoActividad(a._docId, e.target.value)
+                                        setFormInforme((s) => ({ ...s, titulo_informe: e.target.value }))
                                     }
-                                    style={{ ...inputStyle, padding: "8px 10px", maxWidth: 160 }}
-                                    >
-                                    <option value="Pendiente">Pendiente</option>
-                                    <option value="Realizada">Realizada</option>
-                                    <option value="Cancelada">Cancelada</option>
-                                    </select>
-                                </td>
-                                <td style={tdStyle}>
-                                    <button
-                                    type="button"
-                                    onClick={() => eliminarActividad(a._docId)}
-                                    style={{
-                                        padding: "8px 10px",
-                                        borderRadius: 10,
-                                        border: "1px solid rgba(220,38,38,0.25)",
-                                        background: "rgba(220,38,38,0.08)",
-                                        color: "#B91C1C",
-                                        fontWeight: 900,
-                                        cursor: "pointer",
-                                    }}
-                                    >
-                                    Eliminar
-                                    </button>
-                                </td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
+                                    style={inputStyle}
+                                />
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                                <div>
+                                    <div style={{ fontWeight: 900, marginBottom: 6 }}>Fecha inicio</div>
+                                    <input
+                                        type="date"
+                                        value={formInforme.fecha_inicio}
+                                        onChange={(e) =>
+                                            setFormInforme((s) => ({ ...s, fecha_inicio: e.target.value }))
+                                        }
+                                        style={inputStyle}
+                                    />
+                                </div>
+
+                                <div>
+                                    <div style={{ fontWeight: 900, marginBottom: 6 }}>Fecha final</div>
+                                    <input
+                                        type="date"
+                                        value={formInforme.fecha_final}
+                                        onChange={(e) =>
+                                            setFormInforme((s) => ({ ...s, fecha_final: e.target.value }))
+                                        }
+                                        style={inputStyle}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>Tipo de proyecto</div>
+                                <input
+                                    value={formInforme.tipo_proyecto}
+                                    onChange={(e) =>
+                                        setFormInforme((s) => ({ ...s, tipo_proyecto: e.target.value }))
+                                    }
+                                    style={inputStyle}
+                                />
+                            </div>
+
+                            <div>
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>Link lista de asistencia</div>
+                                <input
+                                    value={formInforme.link_asistencia}
+                                    onChange={(e) =>
+                                        setFormInforme((s) => ({ ...s, link_asistencia: e.target.value }))
+                                    }
+                                    style={inputStyle}
+                                />
+                            </div>
+
+                            <div>
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>Link CvLac estudiantes</div>
+                                <input
+                                    value={formInforme.link_cvlac}
+                                    onChange={(e) =>
+                                        setFormInforme((s) => ({ ...s, link_cvlac: e.target.value }))
+                                    }
+                                    style={inputStyle}
+                                />
+                            </div>
+
+                            <div>
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>
+                                    Metodología
+                                </div>
+
+                                <textarea
+                                    value={formInforme.metodologia}
+                                    onChange={(e) =>
+                                        setFormInforme((s) => ({
+                                            ...s,
+                                            metodologia: e.target.value
+                                        }))
+                                    }
+                                    placeholder="Describa la metodología utilizada en el desarrollo de las actividades y proyectos del semillero."
+                                    style={{ ...inputStyle, minHeight: 140 }}
+                                />
+                            </div>
+
+                            <div
+                                style={{
+                                    marginTop: 16,
+                                    padding: 12,
+                                    borderRadius: 12,
+                                    border: "1px solid rgba(245,158,11,0.35)",
+                                    background: "rgba(245,158,11,0.08)",
+                                    color: "#92400e",
+                                    fontWeight: 700,
+                                    lineHeight: 1.5,
+                                }}
+                            >
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>
+                                    Nota importante para diligenciar en el informe
+                                </div>
+
+                                <div>
+                                    "A continuación, se muestran las imagenes y evidencias de dichas actividades: "
+                                </div>
+
+                                <div style={{ marginTop: 8 }}>
+                                    Desde este punto en adelante, no olvide adicionar todas las imágenes,
+                                    figuras y demás evidencias visuales que soporten las actividades,
+                                    resultados e impactos alcanzados del semillero.
+                                </div>
+                            </div>
+
+
+
+                            <div>
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>
+                                    Conclusiones
+                                </div>
+
+                                <textarea
+                                    value={formInforme.conclusiones}
+                                    onChange={(e) =>
+                                        setFormInforme((s) => ({
+                                            ...s,
+                                            conclusiones: e.target.value
+                                        }))
+                                    }
+                                    placeholder="Describa las principales conclusiones obtenidas durante el desarrollo del semillero."
+                                    style={{ ...inputStyle, minHeight: 140 }}
+                                />
+                            </div>
+
+
+                            <div>
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>Referencias</div>
+                                <textarea
+                                    value={formInforme.referencias_texto}
+                                    onChange={(e) =>
+                                        setFormInforme((s) => ({ ...s, referencias_texto: e.target.value }))
+                                    }
+                                    style={{ ...inputStyle, minHeight: 120 }}
+                                />
+                            </div>
+
+                            <div>
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>Líder grupo de investigación</div>
+                                <input
+                                    value={formInforme.lider_grupo_nombre}
+                                    onChange={(e) =>
+                                        setFormInforme((s) => ({ ...s, lider_grupo_nombre: e.target.value }))
+                                    }
+                                    style={inputStyle}
+                                />
+                            </div>
+
+
+                            <div>
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>Director de investigaciones</div>
+                                <input
+                                    value={formInforme.director_investigaciones_nombre}
+                                    onChange={(e) =>
+                                        setFormInforme((s) => ({
+                                            ...s,
+                                            director_investigaciones_nombre: e.target.value,
+                                        }))
+                                    }
+                                    style={inputStyle}
+                                />
+                            </div>
+
+                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                <button type="button" onClick={guardarInformeFinal} style={btnPrimary}>
+                                    Guardar datos del informe
+                                </button>
+
+                                <button type="button" onClick={handleGenerarInforme} style={btnPrimary}>
+                                    Generar informe Word
+                                </button>
+                            </div>
                         </div>
-
-                        
-                    </div>
-                    </div>
+                    </>
                 )}
-                </div>
-
-        
-
-          </>
-        )}
-      </div>
-
-      
-
-
-    </div>
-  );
+            </div>
+        </div>
+    );
 }
+
+

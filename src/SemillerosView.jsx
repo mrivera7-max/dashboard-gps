@@ -6,10 +6,11 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 
-import { deleteDoc } from "firebase/firestore";
+
 
 const cardStyle = {
   background: "white",
@@ -45,6 +46,16 @@ const btnPrimary = {
   cursor: "pointer",
 };
 
+const btnSecondary = {
+  padding: "10px 12px",
+  borderRadius: 12,
+  border: "1px solid rgba(45,156,219,0.35)",
+  background: "white",
+  color: "#1B75BC",
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
 export default function SemillerosView() {
   const [semilleros, setSemilleros] = useState([]);
   const [integrantes, setIntegrantes] = useState([]);
@@ -59,6 +70,11 @@ export default function SemillerosView() {
     descripcion: "",
     linea_principal: "",
     docente_responsable_id: "",
+    correo: "",
+    link_asistencia: "",
+    link_cvlac: "",
+    lider_grupo_nombre: "",
+    director_investigaciones_nombre: "",
   });
 
   useEffect(() => {
@@ -71,9 +87,9 @@ export default function SemillerosView() {
         setSemilleros(data);
       },
       (e) => {
-        console.error("[Semilleros] ERROR code:", err?.code);
-        console.error("[Semilleros] ERROR message:", err?.message);
-        setErr(err?.message || "Error leyendo semilleros.");
+        console.error("[Semilleros] ERROR code:", e?.code);
+        console.error("[Semilleros] ERROR message:", e?.message);
+        setErr(e?.message || "Error leyendo semilleros.");
       }
     );
 
@@ -109,6 +125,25 @@ export default function SemillerosView() {
   const selectedSemillero =
     semilleros.find((s) => s._docId === selectedSemilleroId) || null;
 
+  useEffect(() => {
+    if (!selectedSemillero) return;
+
+    setForm({
+      id_semillero: selectedSemillero.id_semillero || selectedSemillero._docId || "",
+      nombre: selectedSemillero.nombre || "",
+      estado: selectedSemillero.estado || "activo",
+      descripcion: selectedSemillero.descripcion || "",
+      linea_principal: selectedSemillero.linea_principal || "",
+      docente_responsable_id: selectedSemillero.docente_responsable_id || "",
+      correo: selectedSemillero.correo || "",
+      link_asistencia: selectedSemillero.link_asistencia || "",
+      link_cvlac: selectedSemillero.link_cvlac || "",
+      lider_grupo_nombre: selectedSemillero.lider_grupo_nombre || "",
+      director_investigaciones_nombre:
+        selectedSemillero.director_investigaciones_nombre || "",
+    });
+  }, [selectedSemillero]);
+
   const guardarSemillero = async () => {
     try {
       setErr("");
@@ -117,11 +152,19 @@ export default function SemillerosView() {
       const idSem = (form.id_semillero || "").trim().toUpperCase();
       const nombre = (form.nombre || "").trim();
 
-      if (!idSem) return setErr("El ID del semillero es obligatorio.");
-      if (!nombre) return setErr("El nombre del semillero es obligatorio.");
+      if (!idSem) {
+        setErr("El ID del semillero es obligatorio.");
+        return;
+      }
+
+      if (!nombre) {
+        setErr("El nombre del semillero es obligatorio.");
+        return;
+      }
 
       const docente = integrantes.find(
-        (x) => String(x.id).trim() === String(form.docente_responsable_id || "").trim()
+        (x) =>
+          String(x.id).trim() === String(form.docente_responsable_id || "").trim()
       );
 
       const docenteNombre = docente
@@ -138,6 +181,12 @@ export default function SemillerosView() {
           linea_principal: (form.linea_principal || "").trim(),
           docente_responsable_id: (form.docente_responsable_id || "").trim(),
           docente_responsable_nombre: docenteNombre,
+          correo: (form.correo || "").trim(),
+          link_asistencia: (form.link_asistencia || "").trim(),
+          link_cvlac: (form.link_cvlac || "").trim(),
+          lider_grupo_nombre: (form.lider_grupo_nombre || "").trim(),
+          director_investigaciones_nombre:
+            (form.director_investigaciones_nombre || "").trim(),
           updatedAt: serverTimestamp(),
           createdAt: serverTimestamp(),
         },
@@ -145,14 +194,7 @@ export default function SemillerosView() {
       );
 
       setMsg("Semillero guardado correctamente.");
-      setForm({
-        id_semillero: "",
-        nombre: "",
-        estado: "activo",
-        descripcion: "",
-        linea_principal: "",
-        docente_responsable_id: "",
-      });
+      setSelectedSemilleroId(idSem);
     } catch (e) {
       console.error(e);
       setErr("Error guardando el semillero.");
@@ -161,45 +203,80 @@ export default function SemillerosView() {
 
   const eliminarSemillero = async (idSemillero) => {
     try {
-        if (!window.confirm("¿Eliminar este semillero?")) return;
+      setErr("");
+      setMsg("");
 
-        await deleteDoc(doc(db, "semilleros", idSemillero));
+      if (!window.confirm("¿Eliminar este semillero?")) return;
 
-        setMsg("Semillero eliminado correctamente.");
-        setSelectedSemilleroId(null);
+      await deleteDoc(doc(db, "semilleros", idSemillero));
+
+      setMsg("Semillero eliminado correctamente.");
+      setSelectedSemilleroId("");
+      setForm({
+        id_semillero: "",
+        nombre: "",
+        estado: "activo",
+        descripcion: "",
+        linea_principal: "",
+        docente_responsable_id: "",
+        correo: "",
+        link_asistencia: "",
+        link_cvlac: "",
+        lider_grupo_nombre: "",
+        director_investigaciones_nombre: "",
+      });
     } catch (e) {
-        console.error(e);
-        setErr("Error eliminando el semillero.");
+      console.error(e);
+      setErr("Error eliminando el semillero.");
     }
-    };
+  };
 
-    useEffect(() => {
-        if (!selectedSemillero) return;
+  
 
-        setForm({
-            id_semillero: selectedSemillero.id_semillero || selectedSemillero._docId || "",
-            nombre: selectedSemillero.nombre || "",
-            estado: selectedSemillero.estado || "activo",
-            descripcion: selectedSemillero.descripcion || "",
-            linea_principal: selectedSemillero.linea_principal || "",
-            docente_responsable_id: selectedSemillero.docente_responsable_id || "",
-        });
-    }, [selectedSemillero]);
+  const limpiarFormulario = () => {
+    setSelectedSemilleroId("");
+    setForm({
+      id_semillero: "",
+      nombre: "",
+      estado: "activo",
+      descripcion: "",
+      linea_principal: "",
+      docente_responsable_id: "",
+      correo: "",
+      link_asistencia: "",
+      link_cvlac: "",
+      lider_grupo_nombre: "",
+      director_investigaciones_nombre: "",
+    });
+    setErr("");
+    setMsg("");
+  };
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 16 }}>
       <div style={cardStyle}>
         <h3 style={{ marginTop: 0, color: "#1B75BC" }}>Semilleros</h3>
 
-        {err ? <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>{err}</div> : null}
-        {msg ? <div style={{ color: "#166534", fontWeight: 800, marginBottom: 8 }}>{msg}</div> : null}
+        {err ? (
+          <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>
+            {err}
+          </div>
+        ) : null}
+
+        {msg ? (
+          <div style={{ color: "#166534", fontWeight: 800, marginBottom: 8 }}>
+            {msg}
+          </div>
+        ) : null}
 
         <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
           <div>
             <div style={labelStyle}>ID semillero</div>
             <input
               value={form.id_semillero}
-              onChange={(e) => setForm((s) => ({ ...s, id_semillero: e.target.value }))}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, id_semillero: e.target.value }))
+              }
               style={inputStyle}
               placeholder="Ej: ZION"
             />
@@ -231,7 +308,9 @@ export default function SemillerosView() {
             <div style={labelStyle}>Línea principal</div>
             <input
               value={form.linea_principal}
-              onChange={(e) => setForm((s) => ({ ...s, linea_principal: e.target.value }))}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, linea_principal: e.target.value }))
+              }
               style={inputStyle}
               placeholder="Ej: Procesamiento de Señales"
             />
@@ -256,50 +335,34 @@ export default function SemillerosView() {
           </div>
 
           <div>
+            <div style={labelStyle}>Correo institucional</div>
+            <input
+              value={form.correo}
+              onChange={(e) => setForm((s) => ({ ...s, correo: e.target.value }))}
+              style={inputStyle}
+              placeholder="Ej: zion@udi.edu.co"
+            />
+          </div>
+
+          <div>
             <div style={labelStyle}>Descripción</div>
             <textarea
               value={form.descripcion}
-              onChange={(e) => setForm((s) => ({ ...s, descripcion: e.target.value }))}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, descripcion: e.target.value }))
+              }
               style={{ ...inputStyle, minHeight: 90, resize: "vertical" }}
               placeholder="Describe el semillero"
             />
           </div>
 
-          
-
           <button type="button" onClick={guardarSemillero} style={btnPrimary}>
             {selectedSemillero ? "Actualizar semillero" : "Guardar semillero"}
-            </button>
+          </button>
 
-            <button
-            type="button"
-            onClick={() => {
-                setSelectedSemilleroId("");
-                setForm({
-                id_semillero: "",
-                nombre: "",
-                estado: "activo",
-                descripcion: "",
-                linea_principal: "",
-                docente_responsable_id: "",
-                });
-                setErr("");
-                setMsg("");
-            }}
-            style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(45,156,219,0.35)",
-                background: "white",
-                color: "#1B75BC",
-                fontWeight: 900,
-                cursor: "pointer",
-                marginTop: 8
-            }}
-            >
+          <button type="button" onClick={limpiarFormulario} style={btnSecondary}>
             Nuevo semillero
-            </button>
-
+          </button>
         </div>
 
         <div style={{ display: "grid", gap: 8 }}>
@@ -340,33 +403,46 @@ export default function SemillerosView() {
               {selectedSemillero.nombre || "Semillero"}
             </h3>
 
-            
-
             <div style={{ display: "grid", gap: 8 }}>
-              <div><b>ID:</b> {selectedSemillero.id_semillero || "—"}</div>
-              <div><b>Estado:</b> {selectedSemillero.estado || "—"}</div>
-              <div><b>Línea principal:</b> {selectedSemillero.linea_principal || "—"}</div>
-              <div><b>Docente responsable:</b> {selectedSemillero.docente_responsable_nombre || "No asignado"}</div>
-              <div><b>Descripción:</b> {selectedSemillero.descripcion || "—"}</div>
+              <div>
+                <b>ID:</b> {selectedSemillero.id_semillero || "—"}
+              </div>
+              <div>
+                <b>Estado:</b> {selectedSemillero.estado || "—"}
+              </div>
+              <div>
+                <b>Línea principal:</b> {selectedSemillero.linea_principal || "—"}
+              </div>
+              <div>
+                <b>Docente responsable:</b>{" "}
+                {selectedSemillero.docente_responsable_nombre || "No asignado"}
+              </div>
+              <div>
+                <b>Correo:</b> {selectedSemillero.correo || "—"}
+              </div>
+              <div>
+                <b>Descripción:</b> {selectedSemillero.descripcion || "—"}
+              </div>
             </div>
 
-            <div style={{ marginTop: 16 }}>
-                <button
-                    onClick={() => eliminarSemillero(selectedSemillero._docId)}
-                    style={{
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(220,38,38,0.4)",
-                    background: "rgba(220,38,38,0.08)",
-                    color: "#b91c1c",
-                    fontWeight: 900,
-                    cursor: "pointer"
-                    }}
-                >
-                    Eliminar semillero
-                </button>
-                </div>
-
+            <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              
+              <button
+                type="button"
+                onClick={() => eliminarSemillero(selectedSemillero._docId)}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(220,38,38,0.4)",
+                  background: "rgba(220,38,38,0.08)",
+                  color: "#b91c1c",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                Eliminar semillero
+              </button>
+            </div>
           </>
         )}
       </div>
