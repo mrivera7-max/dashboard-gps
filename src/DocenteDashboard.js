@@ -121,13 +121,18 @@ const AREAS_CONOCIMIENTO_MINCIENCIAS = [
 
   const TIPOS_PRODUCTO_POR_CATEGORIA = {
   "Nuevo Conocimiento": [
-    "Artículo A1 (OA)",
-    "Artículo D (OP)",
+    "Artículo A1 (Q1)",
+    "Artículo A2 (Q2)",
+    "Artículo B (Q3)",
+    "Artículo C (Q4)",
+    "Artículo D",
     "Notas científicas A1",
-    "Libro Investigación A1",
-    "Libro Investigación C",
-    "Capítulo Libro A1",
-    "Capítulo Libro C",
+    "Notas científicas A2",
+    "Notas científicas B",
+    "Notas científicas C",
+    "Notas científicas D",
+    "Libro Investigación",
+    "Capítulo Libro",
     "Libro Formación Q1",
     "Patente Invención A1",
     "Patente Modelo utilidad A1",
@@ -138,7 +143,7 @@ const AREAS_CONOCIMIENTO_MINCIENCIAS = [
   ],
 
   "Desarrollo Tecnológico": [
-    "Diseños industriales A",
+    "Diseños industriales",
     "Esquemas de circuito integrado",
     "Software",
     "Plantas piloto",
@@ -146,9 +151,9 @@ const AREAS_CONOCIMIENTO_MINCIENCIAS = [
     "Signos distintivos",
     "Productos nutracéuticos",
     "Colecciones científicas",
-    "Nuevos registros científicos",
+    "Spin-off",
     "Secreto empresarial",
-    "Empresas de base tecnológica A",
+    "Empresas de base tecnológica (Start-up)",
     "Empresas creativas y culturales A1",
     "Innovaciones en procesos y servicios",
     "Regulaciones y normas",
@@ -202,6 +207,10 @@ const AREAS_CONOCIMIENTO_MINCIENCIAS = [
     "Acompañamiento Programa Ondas",
     "Dirección Tesis Maestría",
     "Dirección Tesis Doctorado",
+    "Dirección Pregrado",
+    "Co-Dirección Tesis Doctorado",
+    "Co-Dirección Tesis Maestría",
+    "Co-Dirección Tesis Pregrado",
   ],
 };
 

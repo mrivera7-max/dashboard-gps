@@ -4,14 +4,13 @@ import { httpsCallable } from "firebase/functions";
 import { doc, collection, onSnapshot } from "firebase/firestore";
 import IntegrantesAdminView from "./IntegrantesAdminView";
 import EstadoGeneralGrupo from "./components/EstadoGeneralGrupo";
-
 import SemillerosView from "./SemillerosView";
+import ProspectivaGrupo from "./components/prospectiva/ProspectivaGrupo";
 
 import gpsLogo from "./assets/logo-gps.png";
 import udiLogo from "./assets/logo-udi.png";
 
-import { auth, db, functions } from "./firebaseConfig"; // ajusta ruta real
-
+import { auth, db, functions } from "./firebaseConfig";
 import { generarInformeWordGrupo } from "./utils/generarInformeWordGrupo";
 
 const UDI_BLUE_DARK = "#1B75BC";
@@ -23,19 +22,29 @@ const SYSTEM = {
 };
 
 export default function Dashboard({ logout }) {
-    const role = useMemo(
+  const role = useMemo(
     () => localStorage.getItem("gps_role_selected") || "no definido",
     []
   );
-  const [activeView, setActiveView] = useState("estado"); // estado | docentes
+
+  const [activeView, setActiveView] = useState("estado"); // estado | docentes | semilleros | prospectiva
   const [estadoRefresh, setEstadoRefresh] = useState(0);
-  // Sesión (estado REAL de Firebase Auth)
+
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   const [investigadores, setInvestigadores] = useState([]);
   const [productos, setProductos] = useState([]);
   const [proyectos, setProyectos] = useState([]);
+
+  const [msg, setMsg] = useState("");
+
+  const [kpis, setKpis] = useState({
+    total_productos: null,
+    total_investigadores: null,
+    total_proyectos: null,
+  });
+  const [kpiError, setKpiError] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -45,19 +54,7 @@ export default function Dashboard({ logout }) {
     return () => unsub();
   }, []);
 
-  // Mensaje del botón
-  const [msg, setMsg] = useState("");
-
-  // KPIs
-  const [kpis, setKpis] = useState({
-    total_productos: null,
-    total_investigadores: null,
-    total_proyectos: null,
-  });
-  const [kpiError, setKpiError] = useState("");
-
   useEffect(() => {
-    // OJO: aquí mantengo tu doc actual "kpis/global"
     const ref = doc(db, "kpis", "global");
 
     const unsub = onSnapshot(
@@ -81,12 +78,10 @@ export default function Dashboard({ logout }) {
       }
     );
 
-    
-
     return () => unsub();
-    }, []);
+  }, []);
 
-    useEffect(() => {
+  useEffect(() => {
     const ref = collection(db, "investigadores");
 
     const unsub = onSnapshot(
@@ -134,12 +129,12 @@ export default function Dashboard({ logout }) {
     return () => unsub();
   }, []);
 
-  // Callable: recalcularKPIsManual
   const recalcular = async () => {
     try {
       console.log("authLoading:", authLoading);
       console.log("user state:", user?.email, user?.uid);
       console.log("auth.currentUser:", auth.currentUser?.email, auth.currentUser?.uid);
+
       if (authLoading) {
         setMsg("Cargando sesión…");
         return;
@@ -157,7 +152,6 @@ export default function Dashboard({ logout }) {
       const fn = httpsCallable(functions, "recalcularKPIsManual");
       const res = await fn();
 
-      // Si tu function retorna {status:"ok"} esto queda perfecto
       const status = res?.data?.status;
       setMsg(status === "ok" ? "Listo ✅ Indicadores actualizados" : "Listo ✅");
       setEstadoRefresh((x) => x + 1);
@@ -168,163 +162,198 @@ export default function Dashboard({ logout }) {
   };
 
   const sincronizarSheets = async () => {
-  try {
-    if (authLoading) {
-      setMsg("Cargando sesión…");
-      return;
-    }
-    if (!user) {
-      setMsg("Debes iniciar sesión.");
-      return;
-    }
-    if (role !== "admin") {
-      setMsg("No tienes permisos para sincronizar.");
-      return;
-    }
+    try {
+      if (authLoading) {
+        setMsg("Cargando sesión…");
+        return;
+      }
+      if (!user) {
+        setMsg("Debes iniciar sesión.");
+        return;
+      }
+      if (role !== "admin") {
+        setMsg("No tienes permisos para sincronizar.");
+        return;
+      }
 
-    setMsg("Sincronizando desde Google Sheets…");
-    const fn = httpsCallable(functions, "syncSheets");
-    const res = await fn();
+      setMsg("Sincronizando desde Google Sheets…");
+      const fn = httpsCallable(functions, "syncSheets");
+      const res = await fn();
 
-    const { created, updated, skipped } = res?.data || {};
-    setMsg(`Listo ✅ created:${created ?? 0} updated:${updated ?? 0} skipped:${skipped ?? 0}`);
-    setEstadoRefresh((x) => x + 1);
-  } catch (e) {
-    console.error(e);
-    setMsg(e?.message || "Error sincronizando");
-  }
-  
+      const { created, updated, skipped } = res?.data || {};
+      setMsg(
+        `Listo ✅ created:${created ?? 0} updated:${updated ?? 0} skipped:${skipped ?? 0}`
+      );
+      setEstadoRefresh((x) => x + 1);
+    } catch (e) {
+      console.error(e);
+      setMsg(e?.message || "Error sincronizando");
+    }
   };
 
+  const datosConvocatoria2024 = useMemo(
+    () => ({
+      nombreGrupo:
+        "Grupo de Investigación en Robótica, Control y Procesamiento de Señal - GPS",
+      categoriaActual: "A",
+      indicadorGrupo: 1.0878082216564888,
+      top: 1128.6465358690596,
+      tipoA: 654.133384053872,
+      tipoB: 420.318918162599,
+      asc: 0,
+      divulgacion: 1769.7784705582599,
+      formA: 269.17778929697033,
+      formB: 910.0296908413974,
+      cohesion: 0.711538462,
+      colaboracion: 0.314102564,
+      investigadoresSenior: 5,
+      investigadoresAsociados: 5,
+      investigadoresEmeritos: 0,
+      aniosExistencia: 19,
+    }),
+    []
+  );
+
   return (
-  <div style={styles.page2col}>
-    {/* SIDEBAR */}
-    <aside style={styles.sidebar}>
-      <div style={styles.sideTop}>
-        {/* Logo UDI arriba */}
-        <div style={styles.udiBlock}>
-          <img src={udiLogo} alt="UDI" style={styles.udiLogo} />
-        </div>
+    <div style={styles.page2col}>
+      <aside style={styles.sidebar}>
+        <div style={styles.sideTop}>
+          <div style={styles.udiBlock}>
+            <img src={udiLogo} alt="UDI" style={styles.udiLogo} />
+          </div>
 
-        {/* Marca del sistema */}
-        <div style={styles.sideBrand}>
-          <img src={gpsLogo} alt="GPS" style={styles.sideLogo} />
-          <div>
-            <div style={styles.sideTitle}>GRUPO GPS</div>
+          <div style={styles.sideBrand}>
+            <img src={gpsLogo} alt="GPS" style={styles.sideLogo} />
+            <div>
+              <div style={styles.sideTitle}>GRUPO GPS</div>
+            </div>
+          </div>
+
+          <div style={styles.sideProfile}>
+            <div style={styles.userLineSide}>
+              <span style={styles.userLabel}>Usuario:</span>
+              <span style={styles.userValue}>
+                {authLoading ? "Cargando…" : user?.email || "—"}
+              </span>
+            </div>
+            <div style={styles.userLineSide}>
+              <span style={styles.userLabel}>Rol:</span>
+              <span style={styles.rolePillSide}>
+                {role === "admin" ? "Líder de Grupo" : role}
+              </span>
+            </div>
+          </div>
+
+          <div style={styles.nav}>
+            <NavBtn
+              text="Estado general del grupo"
+              active={activeView === "estado"}
+              onClick={() => setActiveView("estado")}
+            />
+            <NavBtn
+              text="Integrantes"
+              active={activeView === "docentes"}
+              onClick={() => setActiveView("docentes")}
+            />
+            <NavBtn
+              text="Semilleros"
+              active={activeView === "semilleros"}
+              onClick={() => setActiveView("semilleros")}
+            />
+            <NavBtn
+              text="Prospectiva"
+              active={activeView === "prospectiva"}
+              onClick={() => setActiveView("prospectiva")}
+            />
           </div>
         </div>
 
-        <div style={styles.sideProfile}>
-          <div style={styles.userLineSide}>
-            <span style={styles.userLabel}>Usuario:</span>
-            <span style={styles.userValue}>{authLoading ? "Cargando…" : user?.email || "—"}</span>
-          </div>
-          <div style={styles.userLineSide}>
-            <span style={styles.userLabel}>Rol:</span>
-            <span style={styles.rolePillSide}>
-              {role === "admin" ? "Líder de Grupo" : role}
-            </span>
-          </div>
-        </div>
+        <div style={styles.sideBottom}>
+          <button onClick={logout} style={styles.logoutBtnSide}>
+            Cerrar sesión
+          </button>
 
-        <div style={styles.nav}>
-          <NavBtn
-            text="Estado general del grupo"
-            active={activeView === "estado"}
-            onClick={() => setActiveView("estado")}
-          />
-          <NavBtn
-            text="Integrantes"
-            active={activeView === "docentes"}
-            onClick={() => setActiveView("docentes")}
-          />
-          <NavBtn
-            text="Semilleros"
-            active={activeView === "semilleros"}
-            onClick={() => setActiveView("semilleros")}
-          />
-        </div>
-      </div>
-
-      <div style={styles.sideBottom}>
-        <button onClick={logout} style={styles.logoutBtnSide}>
-          Cerrar sesión
-        </button>
-
-        <div style={styles.systemInfoSide}>
-          GPS Research Dashboard v1.0 — 2026 <br />
-          Grupo de Investigación GPS
-        </div>
-      </div>
-    </aside>
-
-    {/* MAIN */}
-    <main style={styles.main}>
-      {/* Topbar opcional: si quieres mantenerla */}
-      <div style={styles.topbar}>
-        <div style={styles.brand}>
-          <img src={gpsLogo} alt="GPS" style={styles.brandLogo} />
-          <div>
-            <div style={styles.brandTitle}>GRUPO GPS</div>
-            <div style={styles.brandSubtitle}>Plataforma de seguimiento (MinCiencias)</div>
+          <div style={styles.systemInfoSide}>
+            {SYSTEM.name} {SYSTEM.version} — {SYSTEM.year}
+            <br />
+            {SYSTEM.group}
           </div>
         </div>
+      </aside>
 
-        {/* Botón recalcular solo admin */}
-        {role === "admin" ? (
-          <div style={styles.actionRow}>
-            <button
-              onClick={sincronizarSheets}
-              style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
-              disabled={authLoading}
-              title={authLoading ? "Cargando sesión…" : "Sincronizar Sheets → Firestore"}
-            >
-              Sincronizar Sheets
-            </button>
-
-            <button
-              onClick={recalcular}
-              style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
-              disabled={authLoading}
-              title={authLoading ? "Cargando sesión…" : "Recalcular Indicadores"}
-            >
-              Recalcular Indicadores
-            </button>
-
-             <button
-              onClick={() =>
-                generarInformeWordGrupo({
-                  kpis,
-                  investigadores: [],   // por ahora temporal
-                  productos: [],        // por ahora temporal
-                  proyectos: [],        // por ahora temporal
-                  nombreLiderGrupo: user?.displayName || user?.email || "—",
-                })
-              }
-              style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
-              disabled={authLoading}
-              title={authLoading ? "Cargando sesión…" : "Generar informe Word del grupo"}
-            >
-              Generar informe
-            </button>
-
-            <div style={styles.msg}>{msg}</div>
+      <main style={styles.main}>
+        <div style={styles.topbar}>
+          <div style={styles.brand}>
+            <img src={gpsLogo} alt="GPS" style={styles.brandLogo} />
+            <div>
+              <div style={styles.brandTitle}>GRUPO GPS</div>
+              <div style={styles.brandSubtitle}>
+                Plataforma de seguimiento (MinCiencias)
+              </div>
+            </div>
           </div>
-        ) : null}
-      </div>
 
-      <div style={styles.content}>
-       {activeView === "estado" ? (
-          <EstadoGeneralGrupo refreshKey={estadoRefresh} />
-        ) : activeView === "docentes" ? (
-          <IntegrantesAdminView refreshKey={estadoRefresh} />
-        ) : activeView === "semilleros" ? (
-          <SemillerosView />
-        ) : null}
-      </div>
-    </main>
-  </div>
-);
+          {role === "admin" ? (
+            <div style={styles.actionRow}>
+              <button
+                onClick={sincronizarSheets}
+                style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
+                disabled={authLoading}
+                title={authLoading ? "Cargando sesión…" : "Sincronizar Sheets → Firestore"}
+              >
+                Sincronizar Sheets
+              </button>
+
+              <button
+                onClick={recalcular}
+                style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
+                disabled={authLoading}
+                title={authLoading ? "Cargando sesión…" : "Recalcular Indicadores"}
+              >
+                Recalcular Indicadores
+              </button>
+
+              <button
+                onClick={() =>
+                  generarInformeWordGrupo({
+                    kpis,
+                    investigadores,
+                    productos,
+                    proyectos,
+                    nombreLiderGrupo: user?.displayName || user?.email || "—",
+                  })
+                }
+                style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
+                disabled={authLoading}
+                title={authLoading ? "Cargando sesión…" : "Generar informe Word del grupo"}
+              >
+                Generar informe
+              </button>
+
+              <div style={styles.msg}>{msg}</div>
+            </div>
+          ) : null}
+        </div>
+
+        <div style={styles.content}>
+          {activeView === "estado" ? (
+            <EstadoGeneralGrupo refreshKey={estadoRefresh} />
+          ) : activeView === "docentes" ? (
+            <IntegrantesAdminView refreshKey={estadoRefresh} />
+          ) : activeView === "semilleros" ? (
+            <SemillerosView />
+          ) : activeView === "prospectiva" ? (
+            <ProspectivaGrupo
+              convocatoria={datosConvocatoria2024}
+              productos={productos}
+              proyectos={proyectos}
+              investigadores={investigadores}
+            />
+          ) : null}
+        </div>
+      </main>
+    </div>
+  );
 }
 
 function NavBtn({ text, active, onClick }) {
@@ -341,43 +370,16 @@ function NavBtn({ text, active, onClick }) {
   );
 }
 
-function KPI({ title, value }) {
-  return (
-    <div style={styles.kpiCard}>
-      <div style={styles.kpiTitle}>{title}</div>
-      <div style={styles.kpiValue}>{value}</div>
-    </div>
-  );
-}
-
-function Panel({ title, children, span = 1 }) {
-  return (
-    <div style={{ ...styles.panel, gridColumn: span === 2 ? "span 2" : "span 1" }}>
-      <div style={styles.panelHeader}>{title}</div>
-      <div style={styles.panelBody}>{children}</div>
-    </div>
-  );
-}
-
-function Placeholder() {
-  return (
-    <div style={styles.placeholder}>
-      Aquí va el contenido (gráficas, tablas, filtros).
-    </div>
-  );
-}
-
 const styles = {
-  
   rolePillSide: {
-  padding: "6px 10px",
-  borderRadius: 999,
-  background: "rgba(255,255,255,0.12)",
-  border: "1px solid rgba(255,255,255,0.25)",
-  color: "white",
-  fontWeight: 900,
-  fontSize: 12.5,
-  textTransform: "capitalize",
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.12)",
+    border: "1px solid rgba(255,255,255,0.25)",
+    color: "white",
+    fontWeight: 900,
+    fontSize: 12.5,
+    textTransform: "capitalize",
   },
 
   page: {
@@ -420,20 +422,6 @@ const styles = {
     fontSize: 12.5,
     marginTop: 2,
   },
-  userBox: {
-    display: "flex",
-    alignItems: "center",
-    gap: 14,
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-  },
-  userLine: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: 13.5,
-    color: "#1F2937",
-  },
   userLabel: {
     color: "#374151",
     fontWeight: 800,
@@ -441,16 +429,6 @@ const styles = {
   userValue: {
     fontWeight: 900,
     color: "#111827",
-  },
-  rolePill: {
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: "rgba(45,156,219,0.12)",
-    border: "1px solid rgba(45,156,219,0.35)",
-    color: UDI_BLUE_DARK,
-    fontWeight: 800,
-    fontSize: 12.5,
-    textTransform: "capitalize",
   },
   logoutBtn: {
     padding: "10px 12px",
@@ -463,194 +441,137 @@ const styles = {
   },
   content: {
     padding: 18,
-    maxWidth: 1300,
+    maxWidth: 1400,
     margin: "0 auto",
-  },
-  errorBox: {
-    marginBottom: 10,
-    color: "#b91c1c",
-    fontWeight: 800,
-    background: "rgba(185, 28, 28, 0.08)",
-    border: "1px solid rgba(185, 28, 28, 0.25)",
-    padding: 10,
-    borderRadius: 12,
-  },
-  kpiGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: 12,
-    marginTop: 4,
-  },
-  kpiCard: {
-    border: "1px solid rgba(45,156,219,0.25)",
-    borderRadius: 14,
-    padding: 16,
-    background: "white",
-    boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
-  },
-  kpiTitle: {
-    fontSize: 13,
-    color: "#4A5568",
-    fontWeight: 800,
-  },
-  kpiValue: {
-    fontSize: 30,
-    fontWeight: 900,
-    marginTop: 6,
-    color: "#111827",
+    width: "100%",
+    boxSizing: "border-box",
   },
   actionRow: {
     marginTop: 12,
     display: "flex",
     gap: 10,
     alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
   },
   msg: {
     color: "#4A5568",
     fontWeight: 800,
   },
-  mainGrid: {
-    marginTop: 14,
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 12,
-  },
-  panel: {
-    border: "1px solid rgba(45,156,219,0.25)",
-    borderRadius: 14,
-    background: "white",
-    boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
-    overflow: "hidden",
-    minHeight: 220,
-  },
-  panelHeader: {
-    padding: "12px 14px",
-    borderBottom: "1px solid rgba(45,156,219,0.18)",
-    fontWeight: 900,
-    color: UDI_BLUE_DARK,
-    fontSize: 14,
-  },
-  panelBody: {
-    padding: 14,
-  },
-  placeholder: {
-    height: 160,
-    borderRadius: 12,
-    border: "1px dashed rgba(45,156,219,0.45)",
-    background: "rgba(45,156,219,0.06)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#4A5568",
-    fontWeight: 700,
-    textAlign: "center",
-    padding: 12,
-  },
 
   systemInfo: {
-  fontSize: 11.5,
-  color: "#6B7280",
-  fontWeight: 800,
-  lineHeight: 1.35,
-  textAlign: "right",
+    fontSize: 11.5,
+    color: "#6B7280",
+    fontWeight: 800,
+    lineHeight: 1.35,
+    textAlign: "right",
   },
 
-page2col: {
-  minHeight: "100vh",
-  display: "grid",
-  gridTemplateColumns: "280px 1fr",
-  background: "rgba(45,156,219,0.10)",
-  fontFamily: "Arial, sans-serif",
-  overflow: "hidden",
-},
-sidebar: {
-  background: "linear-gradient(180deg, #1B75BC 0%, #0F3E68 100%)",
-  borderRight: "1px solid rgba(0,0,0,0.15)",
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "space-between",
-  color: "white",
+  page2col: {
+    minHeight: "100vh",
+    display: "grid",
+    gridTemplateColumns: "280px 1fr",
+    background: "rgba(45,156,219,0.10)",
+    fontFamily: "Arial, sans-serif",
+    overflow: "hidden",
+  },
+  sidebar: {
+    background: "linear-gradient(180deg, #1B75BC 0%, #0F3E68 100%)",
+    borderRight: "1px solid rgba(0,0,0,0.15)",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    color: "white",
+    position: "sticky",
+    top: 0,
+    height: "100vh",
+  },
+  sideTop: { padding: 16 },
+  sideBrand: { display: "flex", gap: 10, alignItems: "center" },
+  sideLogo: { height: 40, width: "auto" },
+  sideTitle: { fontWeight: 900, color: "white" },
+  sideProfile: { marginTop: 14, display: "grid", gap: 8 },
+  nav: { marginTop: 16, display: "grid", gap: 10 },
 
-  position: "sticky",
-  top: 0,
-  height: "100vh",
-},
-sideTop: { padding: 16 },
-sideBrand: { display: "flex", gap: 10, alignItems: "center" },
-sideLogo: { height: 40, width: "auto" },
-sideTitle: { fontWeight: 900, color: "white" },
-sideSubtitle: { marginTop: 2, fontWeight: 700, color: "rgba(255,255,255,0.80)", fontSize: 12 },
-sideProfile: { marginTop: 14, display: "grid", gap: 8 },
-nav: { marginTop: 16, display: "grid", gap: 10 },
+  navBtn: {
+    padding: "12px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.25)",
+    background: "rgba(255,255,255,0.08)",
+    fontWeight: 900,
+    color: "white",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  navBtnActive: {
+    background: "white",
+    border: "none",
+    color: "#1B75BC",
+  },
 
-navBtn: {
-  padding: "12px 12px",
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.25)",
-  background: "rgba(255,255,255,0.08)",
-  fontWeight: 900,
-  color: "white",
-  cursor: "pointer",
-  textAlign: "left",
-},
-navBtnActive: {
-  background: "white",
-  border: "none",
-  color: "#1B75BC",
-},
+  sideBottom: {
+    padding: 16,
+    borderTop: "1px solid rgba(45,156,219,0.18)",
+    position: "sticky",
+    bottom: 0,
+    background:
+      "linear-gradient(180deg, rgba(27,117,188,0.0) 0%, rgba(15,62,104,1) 35%)",
+  },
+  logoutBtnSide: {
+    width: "100%",
+    padding: "12px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.35)",
+    background: "transparent",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  systemInfoSide: {
+    marginTop: 14,
+    fontSize: 11.5,
+    color: "rgba(255,255,255,0.75)",
+    fontWeight: 700,
+    lineHeight: 1.4,
+  },
+  main: {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    height: "100vh",
+    overflowY: "auto",
+  },
 
-sideBottom: { 
-  padding: 16, 
-  borderTop: "1px solid rgba(45,156,219,0.18)",
-  position: "sticky",
-  bottom: 0,
-  background: "linear-gradient(180deg, rgba(27,117,188,0.0) 0%, rgba(15,62,104,1) 35%)", 
-},
-logoutBtnSide: {
-  width: "100%",
-  padding: "12px 12px",
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.35)",
-  background: "transparent",
-  color: "white",
-  fontWeight: 900,
-  cursor: "pointer",
-},
-systemInfoSide: {
-  marginTop: 14,
-  fontSize: 11.5,
-  color: "rgba(255,255,255,0.75)",
-  fontWeight: 700,
-  lineHeight: 1.4,
-},
-main: { 
-  minWidth: 0, 
-  display: "flex", 
-  flexDirection: "column",
-  height: "100vh",
-  overflowY: "auto", 
-},
+  udiBlock: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+    padding: "10px 0",
+    background: "white",
+    borderRadius: 10,
+    boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+  },
 
-udiBlock: {
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  marginBottom: 16,
-  padding: "10px 0",
-  background: "white",          // 👈 contraste real
-  borderRadius: 10,
-  boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
-},
+  udiLogo: {
+    height: 38,
+    width: "auto",
+    objectFit: "contain",
+    filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.25))",
+  },
 
-udiLogo: {
-  height: 38,
-  width: "auto",
-  objectFit: "contain",
-  filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.25))",
-},
-
-userLineSide: { display: "flex", gap: 6, fontSize: 13, color: "rgba(255,255,255,0.9)" },
-userLabelSide: { color: "rgba(255,255,255,0.7)", fontWeight: 800 },
-userValueSide: { color: "white", fontWeight: 800 },
-
+  userLineSide: {
+    display: "flex",
+    gap: 6,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.9)",
+  },
+  userLabelSide: {
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: 800,
+  },
+  userValueSide: {
+    color: "white",
+    fontWeight: 800,
+  },
 };

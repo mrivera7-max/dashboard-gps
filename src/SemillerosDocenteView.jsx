@@ -256,11 +256,11 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
 
             const next = max + 1;
 
-            const idSem = "SEM-" + String(next).padStart(3, "0");
+            const idSemillerista = "SEM-" + String(next).padStart(3, "0");
 
             await addDoc(collection(db, "semilleristas"), {
                 ...nuevoEstudiante,
-                id_semillerista: idSem,
+                id_semillerista: idSemillerista,
                 nombre,
                 semillero_id: selectedSemillero.id_semillero,
                 semillero_nombre: selectedSemillero.nombre || "",
@@ -417,12 +417,12 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
                 if (!ced || cedulasExistentes.has(ced)) continue;
 
                 consecutivo += 1;
-                const idSem = "SEM-" + String(consecutivo).padStart(3, "0");
+                const idSemillerista = "SEM-" + String(consecutivo).padStart(3, "0");
 
                 const ref = doc(collection(db, "semilleristas"));
 
                 batch.set(ref, {
-                    id_semillerista: idSem,
+                    id_semillerista: idSemillerista,
                     nombre: row.nombre,
                     cedula: ced,
                     programa: row.programa || "",
