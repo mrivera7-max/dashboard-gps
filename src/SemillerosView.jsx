@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import SemillerosIndicadoresLider from "./components/SemillerosIndicadoresLider";
 import {
   collection,
   doc,
@@ -9,8 +10,6 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
-
-
 
 const cardStyle = {
   background: "white",
@@ -76,6 +75,8 @@ export default function SemillerosView() {
     lider_grupo_nombre: "",
     director_investigaciones_nombre: "",
   });
+
+  const [mostrarIndicadores, setMostrarIndicadores] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -231,7 +232,7 @@ export default function SemillerosView() {
     }
   };
 
-  
+
 
   const limpiarFormulario = () => {
     setSelectedSemilleroId("");
@@ -252,10 +253,76 @@ export default function SemillerosView() {
     setMsg("");
   };
 
+  useEffect(() => {
+    setMostrarIndicadores(false);
+  }, [selectedSemilleroId]);
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 16 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "280px 380px 1fr",
+        gap: 16,
+        alignItems: "start",
+      }}
+    >
+      {/* COLUMNA 1: LISTA */}
       <div style={cardStyle}>
         <h3 style={{ marginTop: 0, color: "#1B75BC" }}>Semilleros</h3>
+
+        <button
+          type="button"
+          onClick={limpiarFormulario}
+          style={{ ...btnPrimary, width: "100%", marginBottom: 14 }}
+        >
+          Nuevo semillero
+        </button>
+
+        <div style={{ display: "grid", gap: 8 }}>
+          {semilleros.length === 0 ? (
+            <div style={{ color: "#6b7280" }}>No hay semilleros registrados.</div>
+          ) : (
+            semilleros.map((sem) => (
+              <button
+                key={sem._docId}
+                type="button"
+                onClick={() => setSelectedSemilleroId(sem._docId)}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "12px",
+                  borderRadius: 12,
+                  border:
+                    selectedSemilleroId === sem._docId
+                      ? "1px solid rgba(27,117,188,0.55)"
+                      : "1px solid rgba(45,156,219,0.25)",
+                  background:
+                    selectedSemilleroId === sem._docId
+                      ? "rgba(27,117,188,0.10)"
+                      : "white",
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontWeight: 900, color: "#111827" }}>
+                  {sem.nombre || sem.id_semillero || sem._docId}
+                </div>
+                <div style={{ fontSize: 12, color: "#4b5563", marginTop: 4 }}>
+                  ID: {sem.id_semillero || "—"}
+                </div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                  {sem.estado || "—"}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* COLUMNA 2: FORMULARIO */}
+      <div style={cardStyle}>
+        <h3 style={{ marginTop: 0, color: "#1B75BC" }}>
+          {selectedSemillero ? "Editar semillero" : "Crear semillero"}
+        </h3>
 
         {err ? (
           <div style={{ color: "#b91c1c", fontWeight: 800, marginBottom: 8 }}>
@@ -269,7 +336,7 @@ export default function SemillerosView() {
           </div>
         ) : null}
 
-        <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+        <div style={{ display: "grid", gap: 10 }}>
           <div>
             <div style={labelStyle}>ID semillero</div>
             <input
@@ -351,59 +418,44 @@ export default function SemillerosView() {
               onChange={(e) =>
                 setForm((s) => ({ ...s, descripcion: e.target.value }))
               }
-              style={{ ...inputStyle, minHeight: 90, resize: "vertical" }}
+              style={{ ...inputStyle, minHeight: 110, resize: "vertical" }}
               placeholder="Describe el semillero"
             />
           </div>
 
-          <button type="button" onClick={guardarSemillero} style={btnPrimary}>
+          <button
+            type="button"
+            onClick={guardarSemillero}
+            style={{ ...btnPrimary, width: "100%" }}
+          >
             {selectedSemillero ? "Actualizar semillero" : "Guardar semillero"}
           </button>
 
-          <button type="button" onClick={limpiarFormulario} style={btnSecondary}>
-            Nuevo semillero
+          <button
+            type="button"
+            onClick={limpiarFormulario}
+            style={{ ...btnSecondary, width: "100%" }}
+          >
+            Limpiar formulario
           </button>
-        </div>
-
-        <div style={{ display: "grid", gap: 8 }}>
-          {semilleros.map((sem) => (
-            <button
-              key={sem._docId}
-              type="button"
-              onClick={() => setSelectedSemilleroId(sem._docId)}
-              style={{
-                width: "100%",
-                textAlign: "left",
-                padding: "10px 12px",
-                borderRadius: 12,
-                border:
-                  selectedSemilleroId === sem._docId
-                    ? "1px solid rgba(27,117,188,0.55)"
-                    : "1px solid rgba(45,156,219,0.25)",
-                background:
-                  selectedSemilleroId === sem._docId
-                    ? "rgba(27,117,188,0.10)"
-                    : "white",
-                fontWeight: 900,
-                cursor: "pointer",
-              }}
-            >
-              {sem.nombre || sem.id_semillero || sem._docId}
-            </button>
-          ))}
         </div>
       </div>
 
-      <div style={cardStyle}>
+      {/* COLUMNA 3: DETALLE */}
+      <div style={{ ...cardStyle, minHeight: 420 }}>
         {!selectedSemillero ? (
-          <div>Selecciona un semillero para ver su detalle.</div>
+          <div style={{ color: "#4b5563", lineHeight: 1.6 }}>
+            Selecciona un semillero para ver su detalle. Aquí podrás visualizar
+            la información general, responsable, estado y más adelante los
+            indicadores del semillero.
+          </div>
         ) : (
           <>
             <h3 style={{ marginTop: 0, color: "#1B75BC" }}>
               {selectedSemillero.nombre || "Semillero"}
             </h3>
 
-            <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ display: "grid", gap: 10 }}>
               <div>
                 <b>ID:</b> {selectedSemillero.id_semillero || "—"}
               </div>
@@ -425,23 +477,59 @@ export default function SemillerosView() {
               </div>
             </div>
 
-            <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              
-              <button
-                type="button"
-                onClick={() => eliminarSemillero(selectedSemillero._docId)}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(220,38,38,0.4)",
-                  background: "rgba(220,38,38,0.08)",
-                  color: "#b91c1c",
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                Eliminar semillero
-              </button>
+            <div
+              style={{
+                marginTop: 18,
+                paddingTop: 14,
+                borderTop: "1px solid rgba(45,156,219,0.18)",
+              }}
+            >
+              <h4 style={{ marginTop: 0, color: "#1B75BC" }}>Acciones</h4>
+
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setMostrarIndicadores((v) => !v)}
+                  style={btnSecondary}
+                >
+                  {mostrarIndicadores ? "Ocultar indicadores" : "Ver indicadores"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => eliminarSemillero(selectedSemillero._docId)}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid rgba(220,38,38,0.4)",
+                    background: "rgba(220,38,38,0.08)",
+                    color: "#b91c1c",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  Eliminar semillero
+                </button>
+              </div>
+
+              {mostrarIndicadores && (
+                <div
+                  style={{
+                    marginTop: 20,
+                    paddingTop: 16,
+                    borderTop: "1px solid rgba(45,156,219,0.18)",
+                  }}
+                >
+                  <h4 style={{ marginTop: 0, color: "#1B75BC" }}>
+                    Indicadores del semillero
+                  </h4>
+
+                  <SemillerosIndicadoresLider
+                    semilleroId={selectedSemillero?.id_semillero || ""}
+                  />
+                </div>
+              )}
+
             </div>
           </>
         )}
