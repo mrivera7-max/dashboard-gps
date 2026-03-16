@@ -12,6 +12,7 @@ import udiLogo from "./assets/logo-udi.png";
 
 import { auth, db, functions } from "./firebaseConfig";
 import { generarInformeWordGrupo } from "./utils/generarInformeWordGrupo";
+import { generarGraficasInforme } from "./utils/generarGraficasInforme";
 
 const UDI_BLUE_DARK = "#1B75BC";
 const SYSTEM = {
@@ -314,15 +315,26 @@ export default function Dashboard({ logout }) {
               </button>
 
               <button
-                onClick={() =>
-                  generarInformeWordGrupo({
-                    kpis,
-                    investigadores,
-                    productos,
-                    proyectos,
-                    nombreLiderGrupo: user?.displayName || user?.email || "—",
-                  })
-                }
+                onClick={async () => {
+                  try {
+                    
+                    setMsg("Generando documento Word…");
+
+                    await generarInformeWordGrupo({
+                      investigadores,
+                      productos,
+                      proyectos,
+                      nombreLiderGrupo: user?.displayName || user?.email || "—",
+                      datosConvocatoria2024,
+                      
+                    });
+
+                    setMsg("Informe generado correctamente ✅");
+                  } catch (e) {
+                    console.error(e);
+                    setMsg(e?.message || "Error generando informe");
+                  }
+                }}
                 style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
                 disabled={authLoading}
                 title={authLoading ? "Cargando sesión…" : "Generar informe Word del grupo"}
