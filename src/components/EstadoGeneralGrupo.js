@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+
+import ResumenEjecutivoGrupo from "./ResumenEjecutivoGrupo";
+import { calcularResumenEjecutivo } from "../utils/indicadoresResumen";
+
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -486,8 +490,11 @@ export default function EstadoGeneralGrupo({ refreshKey }) {
   if (err) return <div style={{ color: "#b91c1c", fontWeight: 900 }}>{err}</div>;
   if (!kpis) return <div>Cargando Indicadores…</div>;
 
+  
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      
       <section style={card}>
         <h3 style={h3}>Productos</h3>
         <div style={row}>

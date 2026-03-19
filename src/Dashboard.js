@@ -14,6 +14,9 @@ import { auth, db, functions } from "./firebaseConfig";
 import { generarInformeWordGrupo } from "./utils/generarInformeWordGrupo";
 import { generarGraficasInforme } from "./utils/generarGraficasInforme";
 
+import BienvenidaDashboard from "./components/BienvenidaDashboard";
+import { calcularResumenEjecutivo } from "./utils/indicadoresResumen";
+
 const UDI_BLUE_DARK = "#1B75BC";
 const SYSTEM = {
   name: "GPS Research Dashboard",
@@ -28,7 +31,7 @@ export default function Dashboard({ logout }) {
     []
   );
 
-  const [activeView, setActiveView] = useState("estado"); // estado | docentes | semilleros | prospectiva
+  const [activeView, setActiveView] = useState("inicio"); // estado | docentes | semilleros | prospectiva
   const [estadoRefresh, setEstadoRefresh] = useState(0);
 
   const [user, setUser] = useState(null);
@@ -215,6 +218,13 @@ export default function Dashboard({ logout }) {
     []
   );
 
+    const resumenEjecutivo = calcularResumenEjecutivo({
+      investigadores,
+      productos,
+      proyectos,
+      kpis,
+    });
+
   return (
     <div style={styles.page2col}>
       <aside style={styles.sidebar}>
@@ -246,6 +256,11 @@ export default function Dashboard({ logout }) {
           </div>
 
           <div style={styles.nav}>
+            <NavBtn
+              text="Inicio"
+              active={activeView === "inicio"}
+              onClick={() => setActiveView("inicio")}
+            />
             <NavBtn
               text="Estado general del grupo"
               active={activeView === "estado"}
@@ -348,7 +363,9 @@ export default function Dashboard({ logout }) {
         </div>
 
         <div style={styles.content}>
-          {activeView === "estado" ? (
+          {activeView === "inicio" ? (
+            <BienvenidaDashboard resumen={resumenEjecutivo} />
+          ) : activeView === "estado" ? (
             <EstadoGeneralGrupo refreshKey={estadoRefresh} />
           ) : activeView === "docentes" ? (
             <IntegrantesAdminView refreshKey={estadoRefresh} />
@@ -363,6 +380,8 @@ export default function Dashboard({ logout }) {
             />
           ) : null}
         </div>
+
+        
       </main>
     </div>
   );
