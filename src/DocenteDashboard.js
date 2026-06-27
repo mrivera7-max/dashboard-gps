@@ -762,6 +762,9 @@ function ProduccionDocente({ uid, perfil }) {
   const [externoAfiliacion, setExternoAfiliacion] = useState("");
   const [coinvestigadoresExternos, setCoinvestigadoresExternos] = useState([]);
 
+  const [editingProductoId, setEditingProductoId] = useState(null);
+  const [editingProyectoId, setEditingProyectoId] = useState(null);
+
   const [form, setForm] = useState({
     titulo: "",
     tipo_producto: "",
@@ -792,6 +795,7 @@ function ProduccionDocente({ uid, perfil }) {
       (snap) => {
         const data = snap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((x) => x.deleted !== true)
           .sort((a, b) => Number(b.anio || 0) - Number(a.anio || 0));
         setRows(data);
       },
@@ -835,96 +839,69 @@ function ProduccionDocente({ uid, perfil }) {
 
   // ====== Proyectos del docente ======
   useEffect(() => {
-    if (!idInvestigador) {
-      setMisProyectos([]);
-      return;
-    }
-
-    const unsub = onSnapshot(
-      query(
-        collection(db, "proyectos"),
-        where("investigador_principal", "==", idInvestigador)
-      ),
-      async (proySnap) => {
-        try {
-
-          const proyectos = proySnap.docs.map((d) => ({
-            id: d.id,
-            ...d.data()
-          }));
-
-          const prodSnap = await getDocs(
-            query(
-              collection(db, "productos"),
-              where("id_investigador_norm", "==", idInvestigadorNorm)
-            )
-          );
-
-          const productos = prodSnap.docs.map((d) => ({
-            id: d.id,
-            ...d.data()
-          }));
-
-          const proyectosConConteo = proyectos.map((p) => {
-            const productosProyecto = productos.filter(
-              (prod) => (prod.proyecto_asociado_id || "") === p.id
-            );
-
-            const totalProductos = productosProyecto.length;
-
-            const totalNC = productosProyecto.filter(
-              (prod) => (prod.categoria_minciencias_producto || "") === "Nuevo Conocimiento"
-            ).length;
-
-            const totalDT = productosProyecto.filter(
-              (prod) => (prod.categoria_minciencias_producto || "") === "Desarrollo Tecnológico"
-            ).length;
-
-            const totalASC = productosProyecto.filter(
-              (prod) => (prod.categoria_minciencias_producto || "") === "Apropiación Social"
-            ).length;
-
-            return {
-              ...p,
-              total_productos_asociados: totalProductos,
-              total_nc: totalNC,
-              total_dt: totalDT,
-              total_asc: totalASC,
-            };
-          });
-
-          proyectosConConteo.sort(
-            (a, b) => Number(b.anio_inicio || 0) - Number(a.anio_inicio || 0)
-          );
-
-          setMisProyectos(proyectosConConteo);
-
-        } catch (err) {
-          console.error("Error cargando proyectos:", err);
-        }
-      }
-    );
-
-    return () => unsub();
-
-  }, [idInvestigador, idInvestigadorNorm]);
-
-  useEffect(() => {
   if (!idInvestigador) {
     setMisProyectos([]);
     return;
   }
 
-  const qy = query(
-    collection(db, "proyectos"),
-    where("investigador_principal", "==", idInvestigador)
-  );
-
   const unsub = onSnapshot(
-    qy,
-    (snap) => {
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setMisProyectos(data);
+    query(
+      collection(db, "proyectos"),
+      where("investigador_principal", "==", idInvestigador)
+    ),
+    async (proySnap) => {
+      try {
+        const proyectos = proySnap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((p) => p.deleted !== true);
+
+        const prodSnap = await getDocs(
+          query(
+            collection(db, "productos"),
+            where("id_investigador_norm", "==", idInvestigadorNorm)
+          )
+        );
+
+        const productos = prodSnap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((p) => p.deleted !== true);
+
+        const proyectosConConteo = proyectos.map((p) => {
+          const productosProyecto = productos.filter(
+            (prod) => (prod.proyecto_asociado_id || "") === p.id
+          );
+
+          const totalProductos = productosProyecto.length;
+
+          const totalNC = productosProyecto.filter(
+            (prod) => (prod.categoria_minciencias_producto || "") === "Nuevo Conocimiento"
+          ).length;
+
+          const totalDT = productosProyecto.filter(
+            (prod) => (prod.categoria_minciencias_producto || "") === "Desarrollo Tecnológico"
+          ).length;
+
+          const totalASC = productosProyecto.filter(
+            (prod) => (prod.categoria_minciencias_producto || "") === "Apropiación Social"
+          ).length;
+
+          return {
+            ...p,
+            total_productos_asociados: totalProductos,
+            total_nc: totalNC,
+            total_dt: totalDT,
+            total_asc: totalASC,
+          };
+        });
+
+        proyectosConConteo.sort(
+          (a, b) => Number(b.anio_inicio || 0) - Number(a.anio_inicio || 0)
+        );
+
+        setMisProyectos(proyectosConConteo);
+      } catch (err) {
+        console.error("Error cargando proyectos:", err);
+      }
     },
     (e) => {
       console.error("[misProyectos]", e);
@@ -933,7 +910,8 @@ function ProduccionDocente({ uid, perfil }) {
   );
 
   return () => unsub();
-}, [idInvestigador]);
+}, [idInvestigador, idInvestigadorNorm]);
+
 
   const generarCodigoProyecto = async () => {
     const cfgRef = doc(db, "config", "grupoGPS");
@@ -1009,70 +987,171 @@ const quitarCoinvestigadorExterno = (index) => {
   setCoinvestigadoresExternos((prev) => prev.filter((_, i) => i !== index));
 };
 
+const limpiarProyectoForm = () => {
+  setEditingProyectoId(null);
+  setNombreProyecto("");
+  setAnioInicioProyecto(new Date().getFullYear());
+  setEstadoProyecto("En ejecución");
+  setLineaInvestigacion("Robótica");
+  setActoAdministrativo("");
+  setDescripcionProyecto("");
+  setCoinvestigadorGrupoTemp("");
+  setCoinvestigadoresGrupoIds([]);
+  setExternoNombre("");
+  setExternoAfiliacion("");
+  setCoinvestigadoresExternos([]);
+};
+
+const limpiarProductoForm = () => {
+  setEditingProductoId(null);
+  setTitulo("");
+  setAnio(new Date().getFullYear());
+  setEstado("En proceso");
+  setUrl("");
+  setCategoria("Nuevo Conocimiento");
+  setTipo(TIPOS_PRODUCTO_POR_CATEGORIA["Nuevo Conocimiento"][0]);
+  setProyectoAsociado("");
+  setDoi("");
+  setIsbn("");
+  setNumeroRegistro("");
+};
+
+const editarProyecto = (p) => {
+  setEditingProyectoId(p.id);
+  setNombreProyecto(p.nombre_proyecto || "");
+  setAnioInicioProyecto(p.anio_inicio || new Date().getFullYear());
+  setEstadoProyecto(p.estado_proyecto || "En ejecución");
+  setLineaInvestigacion(p.linea_investigacion || "Robótica");
+  setActoAdministrativo(p.acto_administrativo || "");
+  setDescripcionProyecto(p.descripcion_tema || "");
+  setCoinvestigadoresGrupoIds(p.coinvestigadores_grupo_ids || []);
+  setCoinvestigadoresExternos(p.coinvestigadores_externos || []);
+};
+
+const eliminarProyecto = async (id) => {
+  const ok = window.confirm("¿Está seguro de eliminar este proyecto?");
+  if (!ok) return;
+
+  try {
+    await updateDoc(doc(db, "proyectos", id), {
+      deleted: true,
+      updatedAt: serverTimestamp(),
+    });
+
+    if (editingProyectoId === id) limpiarProyectoForm();
+    setMsg("Proyecto eliminado ✅");
+  } catch (e) {
+    console.error(e);
+    setErr("Error eliminando proyecto");
+  }
+};
+
+const editarProducto = (p) => {
+  setEditingProductoId(p.id);
+  setTitulo(p.titulo || "");
+  setCategoria(p.categoria_minciencias_producto || "Nuevo Conocimiento");
+  setTipo(p.tipo_producto || "");
+  setAnio(p.anio || new Date().getFullYear());
+  setEstado(p.estado_producto || "En proceso");
+  setProyectoAsociado(p.proyecto_asociado_id || "");
+  setDoi(p.doi || "");
+  setIsbn(p.isbn || "");
+  setNumeroRegistro(p.numero_registro || "");
+  setUrl(p.url || "");
+};
+
+const eliminarProducto = async (id) => {
+  const ok = window.confirm("¿Está seguro de eliminar este producto?");
+  if (!ok) return;
+
+  try {
+    await updateDoc(doc(db, "productos", id), {
+      deleted: true,
+      updatedAt: serverTimestamp(),
+    });
+
+    if (editingProductoId === id) limpiarProductoForm();
+    setMsg("Producto eliminado ✅");
+  } catch (e) {
+    console.error(e);
+    setErr("Error eliminando producto");
+  }
+};
+
   const crearProyecto = async () => {
-    try {
-      setErr("");
-      setMsg("");
+  try {
+    setErr("");
+    setMsg("");
 
-      if (!idInvestigador) {
-        setErr("No se encontró id_investigador.");
-        return;
-      }
+    if (!idInvestigador) {
+      setErr("No se encontró id_investigador.");
+      return;
+    }
 
-      if (!nombreProyecto.trim()) {
-        setErr("El nombre del proyecto es obligatorio.");
-        return;
-      }
+    if (!nombreProyecto.trim()) {
+      setErr("El nombre del proyecto es obligatorio.");
+      return;
+    }
 
-      const y = Number(anioInicioProyecto);
-      const thisYear = new Date().getFullYear();
+    const y = Number(anioInicioProyecto);
+    const thisYear = new Date().getFullYear();
 
-      if (!Number.isFinite(y) || y < 2000 || y > thisYear + 1) {
-        return setErr(`Año inválido. Usa un valor entre 2000 y ${thisYear + 1}.`);
-      }
+    if (!Number.isFinite(y) || y < 2000 || y > thisYear + 1) {
+      return setErr(`Año inválido. Usa un valor entre 2000 y ${thisYear + 1}.`);
+    }
 
-      const codigoGenerado = await generarCodigoProyecto();
-
-      await setDoc(doc(db, "proyectos", codigoGenerado), {
-        id_proyecto: codigoGenerado,
-        codigo: codigoGenerado,
-        grupo: "GPS",
-
+    if (editingProyectoId) {
+      await updateDoc(doc(db, "proyectos", editingProyectoId), {
         nombre_proyecto: nombreProyecto.trim(),
         anio_inicio: y,
         estado_proyecto: estadoProyecto,
         linea_investigacion: lineaInvestigacion,
         acto_administrativo: actoAdministrativo.trim() || null,
         descripcion_tema: descripcionProyecto.trim() || null,
-
-        investigador_principal: idInvestigador,
-        investigador_principal_norm: idInvestigadorNorm,
         coinvestigadores_grupo_ids: coinvestigadoresGrupoIds,
         coinvestigadores_externos: coinvestigadoresExternos,
-
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
-      setNombreProyecto("");
-      setAnioInicioProyecto(new Date().getFullYear());
-      setEstadoProyecto("En ejecución");
-      setLineaInvestigacion("Robótica");
-      setActoAdministrativo("");
-      setDescripcionProyecto("");
-      setCoinvestigadorGrupoTemp("");
-      setCoinvestigadoresGrupoIds([]);
-      setExternoNombre("");
-      setExternoAfiliacion("");
-      setCoinvestigadoresExternos([]);
-
-      setMsg(`Proyecto registrado ✅ Código asignado: ${codigoGenerado}`);
-
-    } catch (e) {
-      console.error(e);
-      setErr("Error registrando proyecto");
+      limpiarProyectoForm();
+      setMsg("Proyecto actualizado ✅");
+      return;
     }
-  };
+
+    const codigoGenerado = await generarCodigoProyecto();
+
+    await setDoc(doc(db, "proyectos", codigoGenerado), {
+      id_proyecto: codigoGenerado,
+      codigo: codigoGenerado,
+      grupo: "GPS",
+
+      nombre_proyecto: nombreProyecto.trim(),
+      anio_inicio: y,
+      estado_proyecto: estadoProyecto,
+      linea_investigacion: lineaInvestigacion,
+      acto_administrativo: actoAdministrativo.trim() || null,
+      descripcion_tema: descripcionProyecto.trim() || null,
+
+      investigador_principal: idInvestigador,
+      investigador_principal_norm: idInvestigadorNorm,
+      coinvestigadores_grupo_ids: coinvestigadoresGrupoIds,
+      coinvestigadores_externos: coinvestigadoresExternos,
+
+      ownerUid: uid,
+      ownerEmail: auth.currentUser?.email || "",
+      deleted: false,
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    limpiarProyectoForm();
+    setMsg(`Proyecto registrado ✅ Código asignado: ${codigoGenerado}`);
+  } catch (e) {
+    console.error(e);
+    setErr("Error registrando proyecto");
+  }
+};
 
 
   const generarCodigoProducto = async () => {
@@ -1099,75 +1178,87 @@ const quitarCoinvestigadorExterno = (index) => {
   };
 
   const crearProducto = async () => {
-    try {
-      setMsg("");
-      setErr("");
+  try {
+    setMsg("");
+    setErr("");
 
-      if (!uid) return setErr("No hay sesión.");
-      if (!idInvestigador) return setErr("No se encontró id_investigador para este docente.");
+    if (!uid) return setErr("No hay sesión.");
+    if (!idInvestigador) return setErr("No se encontró id_investigador para este docente.");
 
-      const y = Number(anio);
-      const thisYear = new Date().getFullYear();
-      
-      if (!titulo.trim() || titulo.trim().length < 8) {
-        return setErr("El título es obligatorio (mínimo 8 caracteres).");
-      }
+    const y = Number(anio);
+    const thisYear = new Date().getFullYear();
 
-      if (!categoria) {
-        return setErr("Debes seleccionar una categoría MinCiencias.");
-      }
+    if (!titulo.trim() || titulo.trim().length < 8) {
+      return setErr("El título es obligatorio (mínimo 8 caracteres).");
+    }
 
-      const identificadoresDiligenciados = [
-        doi.trim(),
-        isbn.trim(),
-        numeroRegistro.trim(),
-        url.trim(),
-      ].filter(Boolean).length;
+    if (!categoria) {
+      return setErr("Debes seleccionar una categoría MinCiencias.");
+    }
 
-      if (identificadoresDiligenciados === 0) {
-        return setErr("Debes registrar al menos un identificador: DOI, ISBN, número de registro o URL.");
-      }
+    const identificadoresDiligenciados = [
+      doi.trim(),
+      isbn.trim(),
+      numeroRegistro.trim(),
+      url.trim(),
+    ].filter(Boolean).length;
 
-      if (!Number.isFinite(y) || y < 2000 || y > thisYear + 1) {
-        return setErr(`Año inválido. Usa un valor entre 2000 y ${thisYear + 1}.`);
-      }
+    if (identificadoresDiligenciados === 0) {
+      return setErr("Debes registrar al menos un identificador: DOI, ISBN, número de registro o URL.");
+    }
 
-      await addDoc(collection(db, "productos"), {
-        grupo: "GPS",
-        ownerUid: uid, 
-        id_investigador: idInvestigador,
-        id_investigador_norm: idInvestigadorNorm,
+    if (!Number.isFinite(y) || y < 2000 || y > thisYear + 1) {
+      return setErr(`Año inválido. Usa un valor entre 2000 y ${thisYear + 1}.`);
+    }
+
+    if (editingProductoId) {
+      await updateDoc(doc(db, "productos", editingProductoId), {
         titulo: titulo.trim(),
         tipo_producto: tipo,
         anio: y,
         estado_producto: estado,
         categoria_minciencias_producto: categoria,
         proyecto_asociado_id: proyectoAsociado || null,
-
         doi: doi.trim() || null,
         isbn: isbn.trim() || null,
         numero_registro: numeroRegistro.trim() || null,
         url: url.trim() || null,
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
-      setTitulo("");
-      setAnio(new Date().getFullYear());
-      setEstado("Borrador");
-      setUrl("");
-      setCategoria("Nuevo Conocimiento");
-      setTipo(TIPOS_PRODUCTO_POR_CATEGORIA["Nuevo Conocimiento"][0]);
-      setProyectoAsociado("");
-      setDoi("");
-      setIsbn("");
-      setNumeroRegistro("");
-      setMsg("Producto registrado ✅");
-    } catch (e) {
-      console.error(e);
-      setErr(e?.message || "Error creando producto");
+      limpiarProductoForm();
+      setMsg("Producto actualizado ✅");
+      return;
     }
-  };
+
+    await addDoc(collection(db, "productos"), {
+      grupo: "GPS",
+      ownerUid: uid,
+      ownerEmail: auth.currentUser?.email || "",
+      deleted: false,
+      id_investigador: idInvestigador,
+      id_investigador_norm: idInvestigadorNorm,
+      titulo: titulo.trim(),
+      tipo_producto: tipo,
+      anio: y,
+      estado_producto: estado,
+      categoria_minciencias_producto: categoria,
+      proyecto_asociado_id: proyectoAsociado || null,
+      doi: doi.trim() || null,
+      isbn: isbn.trim() || null,
+      numero_registro: numeroRegistro.trim() || null,
+      url: url.trim() || null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    limpiarProductoForm();
+    setMsg("Producto registrado ✅");
+  } catch (e) {
+    console.error(e);
+    setErr(e?.message || "Error creando producto");
+  }
+};
 
   const actualizarEstado = async (id, newEstado) => {
     try {
@@ -1534,10 +1625,16 @@ const quitarCoinvestigadorExterno = (index) => {
           </div>
         </div>
 
-          <div style={{marginTop:12}}>
+          <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
             <button onClick={crearProyecto} style={styles.primaryBtn}>
-              Guardar proyecto
+              {editingProyectoId ? "Actualizar proyecto" : "Guardar proyecto"}
             </button>
+
+            {editingProyectoId && (
+              <button onClick={limpiarProyectoForm} style={styles.secondaryBtn}>
+                Cancelar edición
+              </button>
+            )}
           </div>
       </Card>
       </div>
@@ -1682,23 +1779,38 @@ const quitarCoinvestigadorExterno = (index) => {
           </div>
         </div>
 
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
           <button onClick={crearProducto} style={styles.primaryBtn}>
-            Guardar producto
+            {editingProductoId ? "Actualizar producto" : "Guardar producto"}
           </button>
+
+          {editingProductoId && (
+            <button onClick={limpiarProductoForm} style={styles.secondaryBtn}>
+              Cancelar edición
+            </button>
+          )}
         </div>
       </Card>
       </div>
       
       <div style={styles.sectionBlock}>
       <Card title="Mis proyectos">
-        <ProyectosTable rows={misProyectos} />
+        <ProyectosTable
+          rows={misProyectos}
+          onEdit={editarProyecto}
+          onDelete={eliminarProyecto}
+        />
       </Card>
       </div>
 
       <div style={styles.sectionBlock}>
       <Card title="Mis productos">
-        <ProductosTable rows={rows} onChangeEstado={actualizarEstado} />
+        <ProductosTable
+          rows={rows}
+          onChangeEstado={actualizarEstado}
+          onEdit={editarProducto}
+          onDelete={eliminarProducto}
+        />
       </Card>
       </div>
       </div>
@@ -3440,57 +3552,76 @@ function ConRow({ label, value, onToggle, onUrl }) {
   );
 }
 
-function ProyectosTable({ rows }) {
-
-    if (!rows || rows.length === 0) {
-      return (
-        <div style={{ color: "#4A5568", fontWeight: 700 }}>
-          Sin proyectos registrados todavía.
-        </div>
-      );
-    }
-
+function ProyectosTable({ rows, onEdit, onDelete }) {
+  if (!rows || rows.length === 0) {
     return (
-      <div style={{ overflowX: "auto" }}>
-        <table style={tableStyle}>
-
-          <thead>
-            <tr>
-              <th style={th}>Código</th>
-              <th style={th}>Proyecto</th>
-              <th style={th}>Año</th>
-              <th style={th}>Estado</th>
-              <th style={th}>Línea</th>
-              <th style={th}>Productos</th>
-              <th style={th}>Impacto</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {rows.map((p) => (
-              <tr key={p.id}>
-                <td style={td}>{p.codigo || p.id_proyecto || p.id}</td>
-                <td style={td}>{p.nombre_proyecto || "—"}</td>
-                <td style={td}>{p.anio_inicio || "—"}</td>
-                <td style={td}>{p.estado_proyecto || "—"}</td>
-                <td style={td}>{p.linea_investigacion || "—"}</td>
-                <td style={{ ...td, fontWeight: 900 }}>{p.total_productos_asociados ?? 0}</td>
-                <td style={td}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <span style={styles.impactBadgeNC}>NC: {p.total_nc ?? 0}</span>
-                    <span style={styles.impactBadgeDT}>DT: {p.total_dt ?? 0}</span>
-                    <span style={styles.impactBadgeASC}>ASC: {p.total_asc ?? 0}</span>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-
-        </table>
+      <div style={{ color: "#4A5568", fontWeight: 700 }}>
+        Sin proyectos registrados todavía.
       </div>
     );
   }
 
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            <th style={th}>Código</th>
+            <th style={th}>Proyecto</th>
+            <th style={th}>Año</th>
+            <th style={th}>Estado</th>
+            <th style={th}>Línea</th>
+            <th style={th}>Productos</th>
+            <th style={th}>Impacto</th>
+            <th style={th}>Acciones</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {rows.map((p) => (
+            <tr key={p.id}>
+              <td style={td}>{p.codigo || p.id_proyecto || p.id}</td>
+              <td style={td}>{p.nombre_proyecto || "—"}</td>
+              <td style={td}>{p.anio_inicio || "—"}</td>
+              <td style={td}>{p.estado_proyecto || "—"}</td>
+              <td style={td}>{p.linea_investigacion || "—"}</td>
+              <td style={{ ...td, fontWeight: 900 }}>
+                {p.total_productos_asociados ?? 0}
+              </td>
+
+              <td style={td}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <span style={styles.impactBadgeNC}>NC: {p.total_nc ?? 0}</span>
+                  <span style={styles.impactBadgeDT}>DT: {p.total_dt ?? 0}</span>
+                  <span style={styles.impactBadgeASC}>ASC: {p.total_asc ?? 0}</span>
+                </div>
+              </td>
+
+              <td style={td}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => onEdit?.(p)}
+                    style={styles.secondaryBtn}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete?.(p.id)}
+                    style={styles.secondaryBtn}
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 const estadoColor = {
   "En Proceso": {
     background: "rgba(107,114,128,0.15)",
@@ -3528,7 +3659,7 @@ const estadoBadge = {
   fontSize: 12
 };
 
-function ProductosTable({ rows, onChangeEstado }) {
+function ProductosTable({ rows, onChangeEstado, onEdit, onDelete }) {
   if (!rows || rows.length === 0) {
     return <div style={{ color: "#4A5568", fontWeight: 700 }}>Sin registros todavía.</div>;
   }
@@ -3543,7 +3674,8 @@ function ProductosTable({ rows, onChangeEstado }) {
             <th style={th}>Título</th>
             <th style={th}>Categoría</th>
             <th style={th}>Estado</th>
-             <th style={th}>Identificador</th>
+            <th style={th}>Identificador</th>
+            <th style={th}>Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -3594,7 +3726,25 @@ function ProductosTable({ rows, onChangeEstado }) {
                   
               </td>
               <td style={td}>{p.doi || p.isbn || p.numero_registro || p.url || "—"}</td>
-              
+              <td style={td}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => onEdit?.(p)}
+                    style={styles.secondaryBtn}
+                  >
+                    Editar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onDelete?.(p.id)}
+                    style={styles.secondaryBtn}
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>
