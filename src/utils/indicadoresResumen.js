@@ -16,15 +16,17 @@ export function calcularResumenEjecutivo({
     return false;
   };
 
-  const investigadoresActivos = investigadores.filter(isActivoInv).length;
+  // Excluye registros con eliminación lógica
+  const vigente = (x) => x && x.deleted !== true && normalizar(x.deleted) !== "true";
 
-  const productosTotales =
-    typeof kpis?.total_productos === "number"
-      ? kpis.total_productos
-      : productos.length;
+  const investigadoresActivos = investigadores.filter((i) => vigente(i) && isActivoInv(i)).length;
+
+  // Conteo en vivo desde Firestore (el KPI guardado puede incluir eliminados)
+  const productosTotales = productos.filter(vigente).length;
 
   const proyectosActivos = proyectos.filter((p) => {
-    const estado = normalizar(p?.estado);
+    if (!vigente(p)) return false;
+    const estado = normalizar(p?.estado_proyecto || p?.estado);
     return (
       estado === "en ejecución" ||
       estado === "en ejecucion" ||
@@ -39,7 +41,9 @@ export function calcularResumenEjecutivo({
 
   const categoriaGrupo = "A";
 
-  const brechaA1 = Math.max(100 - productosTotales, 0);
+  // La brecha real hacia A1 requiere los umbrales oficiales MinCiencias (ver Prospectiva).
+  // Mientras no estén cargados, se muestra como pendiente en lugar de un valor ficticio.
+  const brechaA1 = null;
 
   return {
     investigadoresActivos,

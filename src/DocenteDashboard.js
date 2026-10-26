@@ -8,7 +8,6 @@ import SemillerosDocenteView from "./SemillerosDocenteView";
 
 
 import {
-  addDoc,
   collection,
   doc,
   onSnapshot,
@@ -1154,27 +1153,32 @@ const eliminarProducto = async (id) => {
 };
 
 
-  const generarCodigoProducto = async () => {
+  // Crea el producto con ID consecutivo GPS-### (continúa la numeración de Sheets).
+  // El contador vive en config/grupoGPS.contador_productos_gps.
+  const crearProductoConsecutivo = async (datos) => {
     const cfgRef = doc(db, "config", "grupoGPS");
 
-    const nextNumber = await runTransaction(db, async (tx) => {
+    return runTransaction(db, async (tx) => {
       const snap = await tx.get(cfgRef);
-      const actual = snap.exists() ? Number(snap.data()?.contador_productos || 0) : 0;
-      const siguiente = actual + 1;
+      const actual = snap.exists() ? Number(snap.data()?.contador_productos_gps || 0) : 0;
+      if (!actual) {
+        throw new Error("Contador de productos no inicializado. Contacta al líder del grupo.");
+      }
 
+      const siguiente = actual + 1;
+      const nuevoId = `GPS-${String(siguiente).padStart(3, "0")}`;
+      const prodRef = doc(db, "productos", nuevoId);
+      const prodSnap = await tx.get(prodRef);
+      if (prodSnap.exists()) throw new Error(`El ID ${nuevoId} ya existe. Intenta de nuevo.`);
+
+      tx.set(prodRef, { ...datos, id_producto: nuevoId });
       tx.set(
         cfgRef,
-        {
-          contador_productos: siguiente,
-          updatedAt: serverTimestamp(),
-        },
+        { contador_productos_gps: siguiente, updatedAt: serverTimestamp() },
         { merge: true }
       );
-
-      return siguiente;
+      return nuevoId;
     });
-
-    return `PROD-${String(nextNumber).padStart(3, "0")}`;
   };
 
   const crearProducto = async () => {
@@ -1231,7 +1235,7 @@ const eliminarProducto = async (id) => {
       return;
     }
 
-    await addDoc(collection(db, "productos"), {
+    const nuevoId = await crearProductoConsecutivo({
       grupo: "GPS",
       ownerUid: uid,
       ownerEmail: auth.currentUser?.email || "",
@@ -1253,7 +1257,7 @@ const eliminarProducto = async (id) => {
     });
 
     limpiarProductoForm();
-    setMsg("Producto registrado ✅");
+    setMsg(`Producto registrado ✅ (${nuevoId})`);
   } catch (e) {
     console.error(e);
     setErr(e?.message || "Error creando producto");

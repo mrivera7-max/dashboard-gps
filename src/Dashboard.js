@@ -13,11 +13,18 @@ import udiLogo from "./assets/logo-udi.png";
 import { auth, db, functions } from "./firebaseConfig";
 import { generarInformeWordGrupo } from "./utils/generarInformeWordGrupo";
 import { generarGraficasInforme } from "./utils/generarGraficasInforme";
+import { exportarHistoricoExcel } from "./utils/exportarHistoricoExcel";
 
 import BienvenidaDashboard from "./components/BienvenidaDashboard";
 import { calcularResumenEjecutivo } from "./utils/indicadoresResumen";
 
 const UDI_BLUE_DARK = "#1B75BC";
+
+// Íconos de la barra superior
+const iconoProps = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true };
+const IconoSigma = () => (<svg {...iconoProps}><path d="M18 4H6l6 8-6 8h12" /></svg>);
+const IconoDescarga = () => (<svg {...iconoProps}><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14" /></svg>);
+const IconoDocumento = () => (<svg {...iconoProps}><path d="M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h6" /></svg>);
 const SYSTEM = {
   name: "GPS Research Dashboard",
   version: "v1.0",
@@ -41,7 +48,16 @@ export default function Dashboard({ logout }) {
   const [productos, setProductos] = useState([]);
   const [proyectos, setProyectos] = useState([]);
 
-  const [msg, setMsg] = useState("");
+  // Aviso flotante: { texto, tipo: "ok" | "error" | "info" }
+  const [aviso, setAviso] = useState(null);
+  const avisar = (texto, tipo = "info") => setAviso({ texto, tipo, t: Date.now() });
+  useEffect(() => {
+    if (!aviso || aviso.tipo === "info") return undefined;
+    const id = setTimeout(() => setAviso(null), aviso.tipo === "error" ? 6000 : 4000);
+    return () => clearTimeout(id);
+  }, [aviso]);
+  const [histDesde, setHistDesde] = useState("");
+  const [histHasta, setHistHasta] = useState("");
 
   const [kpis, setKpis] = useState({
     total_productos: null,
@@ -140,58 +156,28 @@ export default function Dashboard({ logout }) {
       console.log("auth.currentUser:", auth.currentUser?.email, auth.currentUser?.uid);
 
       if (authLoading) {
-        setMsg("Cargando sesión…");
+        avisar("Cargando sesión…", "info");
         return;
       }
       if (!user) {
-        setMsg("Debes iniciar sesión.");
+        avisar("Debes iniciar sesión.", "error");
         return;
       }
       if (role !== "admin") {
-        setMsg("No tienes permisos para recalcular Indicadores.");
+        avisar("No tienes permisos para recalcular indicadores.", "error");
         return;
       }
 
-      setMsg("Recalculando…");
+      avisar("Recalculando indicadores…", "info");
       const fn = httpsCallable(functions, "recalcularKPIsManual");
       const res = await fn();
 
       const status = res?.data?.status;
-      setMsg(status === "ok" ? "Listo ✅ Indicadores actualizados" : "Listo ✅");
+      avisar(status === "ok" ? "Indicadores actualizados" : "Recálculo terminado", "ok");
       setEstadoRefresh((x) => x + 1);
     } catch (e) {
       console.error(e);
-      setMsg(e?.message || "Error recalculando Indicadores");
-    }
-  };
-
-  const sincronizarSheets = async () => {
-    try {
-      if (authLoading) {
-        setMsg("Cargando sesión…");
-        return;
-      }
-      if (!user) {
-        setMsg("Debes iniciar sesión.");
-        return;
-      }
-      if (role !== "admin") {
-        setMsg("No tienes permisos para sincronizar.");
-        return;
-      }
-
-      setMsg("Sincronizando desde Google Sheets…");
-      const fn = httpsCallable(functions, "syncSheets");
-      const res = await fn();
-
-      const { created, updated, skipped } = res?.data || {};
-      setMsg(
-        `Listo ✅ created:${created ?? 0} updated:${updated ?? 0} skipped:${skipped ?? 0}`
-      );
-      setEstadoRefresh((x) => x + 1);
-    } catch (e) {
-      console.error(e);
-      setMsg(e?.message || "Error sincronizando");
+      avisar("No se pudieron recalcular los indicadores. Intenta de nuevo.", "error");
     }
   };
 
@@ -311,56 +297,103 @@ export default function Dashboard({ logout }) {
 
           {role === "admin" ? (
             <div style={styles.actionRow}>
-              <button
-                onClick={sincronizarSheets}
-                style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
-                disabled={authLoading}
-                title={authLoading ? "Cargando sesión…" : "Sincronizar Sheets → Firestore"}
-              >
-                Sincronizar Sheets
-              </button>
-
+              {/* Mantenimiento */}
               <button
                 onClick={recalcular}
-                style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
+                style={{ ...styles.btnGhost, opacity: authLoading ? 0.6 : 1 }}
                 disabled={authLoading}
-                title={authLoading ? "Cargando sesión…" : "Recalcular Indicadores"}
+                title="Recalcular los indicadores del grupo"
               >
-                Recalcular Indicadores
+                <IconoSigma /> Recalcular
               </button>
 
+              <div style={styles.separador} />
+
+              {/* Histórico */}
+              <div style={styles.histBox}>
+                <span style={styles.histLabel}>Histórico</span>
+                <input
+                  type="number"
+                  placeholder="Desde"
+                  value={histDesde}
+                  onChange={(e) => setHistDesde(e.target.value)}
+                  style={styles.histInput}
+                  title="Año inicial (vacío = desde el inicio)"
+                />
+                <span style={{ color: "#94a3b8" }}>–</span>
+                <input
+                  type="number"
+                  placeholder="Hasta"
+                  value={histHasta}
+                  onChange={(e) => setHistHasta(e.target.value)}
+                  style={styles.histInput}
+                  title="Año final (vacío = hasta hoy)"
+                />
+                <button
+                  onClick={() => {
+                    try {
+                      const r = exportarHistoricoExcel({
+                        investigadores,
+                        productos,
+                        proyectos,
+                        desde: histDesde ? Number(histDesde) : null,
+                        hasta: histHasta ? Number(histHasta) : null,
+                      });
+                      avisar(`Histórico descargado: ${r.proyectos} proyectos, ${r.productos} productos`, "ok");
+                    } catch (e) {
+                      console.error(e);
+                      avisar("No se pudo generar el histórico. Intenta de nuevo.", "error");
+                    }
+                  }}
+                  style={{ ...styles.histBtn, opacity: authLoading ? 0.6 : 1 }}
+                  disabled={authLoading}
+                  title="Descargar histórico de proyectos y productos en Excel"
+                >
+                  <IconoDescarga /> Excel
+                </button>
+              </div>
+
+              <div style={styles.separador} />
+
+              {/* Acción principal */}
               <button
                 onClick={async () => {
                   try {
-                    
-                    setMsg("Generando documento Word…");
-
+                    avisar("Generando documento Word…", "info");
                     await generarInformeWordGrupo({
                       investigadores,
                       productos,
                       proyectos,
                       nombreLiderGrupo: user?.displayName || user?.email || "—",
                       datosConvocatoria2024,
-                      
                     });
-
-                    setMsg("Informe generado correctamente ✅");
+                    avisar("Informe generado correctamente", "ok");
                   } catch (e) {
                     console.error(e);
-                    setMsg(e?.message || "Error generando informe");
+                    avisar("No se pudo generar el informe. Intenta de nuevo.", "error");
                   }
                 }}
-                style={{ ...styles.logoutBtn, opacity: authLoading ? 0.6 : 1 }}
+                style={{ ...styles.btnPrimario, opacity: authLoading ? 0.6 : 1 }}
                 disabled={authLoading}
-                title={authLoading ? "Cargando sesión…" : "Generar informe Word del grupo"}
+                title="Generar informe Word del grupo"
               >
-                Generar informe
+                <IconoDocumento /> Generar informe
               </button>
-
-              <div style={styles.msg}>{msg}</div>
             </div>
           ) : null}
         </div>
+
+        {aviso ? (
+          <div
+            role="status"
+            onClick={() => setAviso(null)}
+            style={{ ...styles.aviso, ...styles[`aviso_${aviso.tipo}`] }}
+            title="Clic para cerrar"
+          >
+            {aviso.tipo === "ok" ? "✓ " : aviso.tipo === "error" ? "⚠ " : "⏳ "}
+            {aviso.texto}
+          </div>
+        ) : null}
 
         <div style={styles.content}>
           {activeView === "inicio" ? (
@@ -478,17 +511,103 @@ const styles = {
     boxSizing: "border-box",
   },
   actionRow: {
-    marginTop: 12,
     display: "flex",
-    gap: 10,
+    gap: 12,
     alignItems: "center",
     flexWrap: "wrap",
     justifyContent: "flex-end",
   },
-  msg: {
-    color: "#4A5568",
+  btnGhost: {
+    height: 38,
+    padding: "0 14px",
+    borderRadius: 10,
+    border: "1px solid #cbd5e1",
+    background: "white",
+    color: "#334155",
     fontWeight: 800,
+    fontSize: 13.5,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
+    cursor: "pointer",
   },
+  btnPrimario: {
+    height: 38,
+    padding: "0 16px",
+    borderRadius: 10,
+    border: "none",
+    background: UDI_BLUE_DARK,
+    color: "white",
+    fontWeight: 800,
+    fontSize: 13.5,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
+    cursor: "pointer",
+    boxShadow: "0 4px 12px rgba(27,117,188,0.30)",
+  },
+  separador: {
+    width: 1,
+    height: 30,
+    background: "#e2e8f0",
+  },
+  histBox: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    background: "#f1f5f9",
+    border: "1px solid #e2e8f0",
+    borderRadius: 12,
+    padding: "5px 6px 5px 12px",
+  },
+  histLabel: {
+    fontSize: 12,
+    fontWeight: 800,
+    color: "#475569",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  histInput: {
+    width: 72,
+    height: 30,
+    border: "1px solid #cbd5e1",
+    borderRadius: 8,
+    background: "white",
+    textAlign: "center",
+    fontSize: 13.5,
+    color: "#0f172a",
+    boxSizing: "border-box",
+  },
+  histBtn: {
+    height: 30,
+    padding: "0 10px",
+    borderRadius: 8,
+    border: `1px solid ${UDI_BLUE_DARK}`,
+    background: "white",
+    color: UDI_BLUE_DARK,
+    fontWeight: 800,
+    fontSize: 12.5,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 5,
+    cursor: "pointer",
+  },
+  aviso: {
+    position: "fixed",
+    top: 86,
+    right: 24,
+    zIndex: 50,
+    maxWidth: 420,
+    padding: "11px 14px",
+    borderRadius: 10,
+    fontSize: 13.5,
+    fontWeight: 800,
+    boxShadow: "0 8px 20px rgba(0,0,0,0.10)",
+    cursor: "pointer",
+  },
+  aviso_ok: { background: "#ecfdf5", border: "1px solid #86efac", color: "#166534" },
+  aviso_error: { background: "#fef2f2", border: "1px solid #fca5a5", color: "#991b1b" },
+  aviso_info: { background: "#eff6ff", border: "1px solid #93c5fd", color: "#1e3a8a" },
 
   systemInfo: {
     fontSize: 11.5,

@@ -15,7 +15,7 @@ export default function BienvenidaDashboard({ resumen }) {
         { icono: "📄", valor: productosTotales, label: "Productos totales" },
         { icono: "🗂️", valor: proyectosActivos, label: "Proyectos activos" },
         { icono: "📈", valor: productividadPromedio, label: "Productividad promedio" },
-        { icono: "🎯", valor: brechaA1, label: "Brecha hacia A1" },
+        { icono: "🎯", valor: brechaA1 ?? "Pendiente", label: "Brecha hacia A1" },
     ];
 
     return (

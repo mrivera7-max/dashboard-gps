@@ -6,7 +6,6 @@ import {
   orderBy,
   onSnapshot,
   getDocs,
-  addDoc,
   doc,
   updateDoc,
   runTransaction,
@@ -124,12 +123,6 @@ const estadoColor = {
     fontWeight: 900,
     fontSize: 12
   };
-
-const makeInvId = (docId) => {
-  const clean = (docId || "").replace(/[^a-zA-Z0-9]/g, "");
-  const tail = clean.slice(-6).toUpperCase();
-  return `INV-${tail || "XXXXXX"}`;
-};
 
 function PerfilHeader({ inv }) {
   const nombre = inv
@@ -1072,23 +1065,40 @@ function AdminIntegrantesModal({ open, onClose, integrantes, onToggle, liderDocI
 
       const activo = !!form.activo;
 
-      // 1) crear doc
-      const ref = await addDoc(collection(db, "investigadores"), {
-        ...form,
-        nombres,
-        apellidos,
-        email: email || "",
-        activo,
-        estado_investigador: activo ? "Activo" : "Inactivo",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      // 1) consecutivo: máximo INV-### existente (respaldo si el contador no existe)
+      const snapAll = await getDocs(collection(db, "investigadores"));
+      let maxExist = 0;
+      snapAll.docs.forEach((d) => {
+        const m = String(d.data().id_investigador || d.id).match(/^INV-(\d+)$/i);
+        if (m) maxExist = Math.max(maxExist, parseInt(m[1], 10));
       });
 
-      // 2) setear id_investigador estable
-      const newId = makeInvId(ref.id);
-      await updateDoc(doc(db, "investigadores", ref.id), {
-        id_investigador: newId,
-        updatedAt: serverTimestamp(),
+      // 2) crear doc con ID consecutivo dentro de una transacción (evita IDs repetidos)
+      await runTransaction(db, async (tx) => {
+        const ctrRef = doc(db, "config", "contadores");
+        const ctrSnap = await tx.get(ctrRef);
+        const ultimo = Math.max(
+          ctrSnap.exists() ? Number(ctrSnap.data().investigadores) || 0 : 0,
+          maxExist
+        );
+        const n = ultimo + 1;
+        const newId = `INV-${String(n).padStart(3, "0")}`;
+        const invRef = doc(db, "investigadores", newId);
+        const invSnap = await tx.get(invRef);
+        if (invSnap.exists()) throw new Error(`El ID ${newId} ya existe. Intenta de nuevo.`);
+
+        tx.set(invRef, {
+          ...form,
+          id_investigador: newId,
+          nombres,
+          apellidos,
+          email: email || "",
+          activo,
+          estado_investigador: activo ? "Activo" : "Inactivo",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        tx.set(ctrRef, { investigadores: n, updatedAt: serverTimestamp() }, { merge: true });
       });
 
       // listo
@@ -1096,7 +1106,7 @@ function AdminIntegrantesModal({ open, onClose, integrantes, onToggle, liderDocI
       setShowCreate(false);
     } catch (e) {
       console.error(e);
-      setErr("Error creando integrante. Revisa consola/logs.");
+      setErr(e?.message || "Error creando integrante. Revisa consola/logs.");
     } finally {
       setSaving(false);
     }

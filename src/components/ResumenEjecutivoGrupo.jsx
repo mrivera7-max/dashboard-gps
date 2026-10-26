@@ -36,7 +36,7 @@ export default function ResumenEjecutivoGrupo({ data }) {
         },
         {
             titulo: "Brecha hacia A1",
-            valor: brechaA1,
+            valor: brechaA1 ?? "Pendiente",
             subtitulo: "Meta pendiente estimada",
         },
     ];
