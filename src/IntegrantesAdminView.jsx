@@ -1363,13 +1363,17 @@ const setLider = async (nuevoLiderDocId) => {
     const inv = invSnap.data();
     if (!inv.activo) throw new Error("Solo puedes asignar líder a un integrante ACTIVO");
 
+    const email = String(inv.email || "").toLowerCase().trim();
+    if (!email) throw new Error("El integrante no tiene correo registrado. Agrégalo antes de asignarlo como líder.");
+
     // si config no existe, lo creas
-    const prev = cfgSnap.exists() ? (cfgSnap.data().liderDocId || null) : null;
+    const cfg = cfgSnap.exists() ? cfgSnap.data() : {};
+    if (cfg.liderDocId === nuevoLiderDocId && cfg.liderEmail === email) return; // ya es líder
 
-    if (prev === nuevoLiderDocId) return; // ya es líder
-
+    // liderEmail controla el ingreso como "Líder de Grupo" y el acceso total a semilleros
     tx.set(cfgRef, {
       liderDocId: nuevoLiderDocId,
+      liderEmail: email,
       updatedAt: serverTimestamp(),
       // updatedBy: auth.currentUser?.uid ?? null, // opcional
     }, { merge: true });

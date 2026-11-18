@@ -371,9 +371,23 @@ export default function DocenteDashboard({ logout }) {
   return () => unsub();
 }, [uid]);
 
+// Líder de grupo vigente (config/grupoGPS.liderEmail): tiene acceso a todos los semilleros
+const [liderEmailGrupo, setLiderEmailGrupo] = useState("");
+useEffect(() => {
+  const unsub = onSnapshot(
+    doc(db, "config", "grupoGPS"),
+    (snap) => setLiderEmailGrupo((snap.data()?.liderEmail || "").toLowerCase().trim()),
+    (e) => console.error("[liderGrupo]", e)
+  );
+  return () => unsub();
+}, []);
+
 useEffect(() => {
   const idInv = (perfil?.id_investigador || "").toString().trim();
-  if (!idInv) {
+  const emailUser = (auth.currentUser?.email || "").toLowerCase().trim();
+  const esLiderGrupo = !!emailUser && emailUser === liderEmailGrupo;
+
+  if (!idInv && !esLiderGrupo) {
     setMisSemilleros([]);
     return;
   }
@@ -384,14 +398,14 @@ useEffect(() => {
       const data = snap.docs
         .map((d) => ({ _docId: d.id, ...d.data() }))
         .filter((s) => {
+          if (esLiderGrupo) return true; // el líder asignado gestiona todos
+
           const esResponsable =
             String(s.docente_responsable_id || "").trim() === idInv;
 
-          const esLider =
-            String(s.lider_grupo_id || "").trim() === idInv;
-
-          return esResponsable || esLider;
-        });
+          return esResponsable;
+        })
+        .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
       setMisSemilleros(data);
     },
@@ -401,7 +415,7 @@ useEffect(() => {
   );
 
   return () => unsub();
-}, [perfil?.id_investigador]);
+}, [perfil?.id_investigador, liderEmailGrupo]);
 
   return (
     <div style={styles.page}>

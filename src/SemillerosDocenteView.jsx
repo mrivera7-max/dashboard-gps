@@ -57,8 +57,12 @@ const btnPrimary = {
     cursor: "pointer",
 };
 
-export default function SemillerosDocenteView({ semilleros = [] }) {
-    const [selectedId, setSelectedId] = useState("");
+export default function SemillerosDocenteView({
+    semilleros = [],
+    initialSelectedId = "",
+    titulo = "Mis semilleros",
+}) {
+    const [selectedId, setSelectedId] = useState(initialSelectedId);
 
     const [vistaSemillero, setVistaSemillero] = useState("detalle");
 
@@ -919,7 +923,7 @@ export default function SemillerosDocenteView({ semilleros = [] }) {
     return (
         <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
             <div style={cardStyle}>
-                <h3 style={{ marginTop: 0, color: "#1B75BC" }}>Mis semilleros</h3>
+                <h3 style={{ marginTop: 0, color: "#1B75BC" }}>{titulo}</h3>
 
                 {semilleros.length === 0 ? (
                     <div style={{ color: "#666" }}>No tienes semilleros asignados.</div>

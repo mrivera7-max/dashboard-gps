@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import SemillerosIndicadoresLider from "./components/SemillerosIndicadoresLider";
+import SemillerosDocenteView from "./SemillerosDocenteView";
 import {
   collection,
   doc,
@@ -77,6 +78,8 @@ export default function SemillerosView() {
   });
 
   const [mostrarIndicadores, setMostrarIndicadores] = useState(false);
+  // _docId del semillero que el líder está gestionando (acceso completo)
+  const [gestionandoId, setGestionandoId] = useState("");
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -256,6 +259,27 @@ export default function SemillerosView() {
   useEffect(() => {
     setMostrarIndicadores(false);
   }, [selectedSemilleroId]);
+
+  if (gestionandoId) {
+    return (
+      <div style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <button type="button" onClick={() => setGestionandoId("")} style={btnSecondary}>
+            ← Volver a la administración de semilleros
+          </button>
+          <span style={{ color: "#4b5563", fontWeight: 700 }}>
+            Gestión completa como líder de grupo: estudiantes, proyectos, productos, actividades e informe.
+          </span>
+        </div>
+        <SemillerosDocenteView
+          key={gestionandoId}
+          semilleros={semilleros}
+          initialSelectedId={gestionandoId}
+          titulo="Semilleros del grupo"
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -487,6 +511,15 @@ export default function SemillerosView() {
               <h4 style={{ marginTop: 0, color: "#1B75BC" }}>Acciones</h4>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setGestionandoId(selectedSemillero._docId)}
+                  style={btnPrimary}
+                  title="Administrar estudiantes, proyectos, productos, actividades e informe"
+                >
+                  Gestionar semillero
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setMostrarIndicadores((v) => !v)}
